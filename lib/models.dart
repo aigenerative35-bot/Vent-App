@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'theme.dart';
 
 class Comment {
   final String author;
@@ -47,21 +48,21 @@ class AppNotification {
 }
 
 const List<String> moodList = [
-  'Gussa',
-  'Udaas',
-  'Stress',
-  'Khushi',
-  'Akela',
-  'Shukriya',
+  'Angry',
+  'Sad',
+  'Stressed',
+  'Happy',
+  'Lonely',
+  'Grateful',
 ];
 
 const Map<String, Color> moodColors = {
-  'Gussa': Color(0xFFE5484D),
-  'Udaas': Color(0xFF6B7A90),
-  'Stress': Color(0xFFF79009),
-  'Khushi': Color(0xFF12B76A),
-  'Akela': Color(0xFF7C5CFF),
-  'Shukriya': Color(0xFF1D9BF0),
+  'Angry': Color(0xFFEF4444),
+  'Sad': Color(0xFF6B7A90),
+  'Stressed': Color(0xFFF59E0B),
+  'Happy': Color(0xFF22C55E),
+  'Lonely': Color(0xFF7C5CFF),
+  'Grateful': Color(0xFF22D3EE),
 };
 
 /// In-memory demo store. Firebase (Auth + Firestore) will replace this later;
@@ -72,11 +73,12 @@ class AppState extends ChangeNotifier {
   final List<Post> myPosts = [];
 
   int streak = 5;
-  int followers = 128;
-  int following = 74;
+  int followers = 1284;
+  int following = 316;
   final List<String> badges = ['First post', '7-day streak', 'Helpful'];
   String username = 'Anjaan';
-  String bio = 'Yahan dil ki baat likhta hoon. Anjaan rehna pasand hai.';
+  String handle = '@anjaan';
+  String bio = 'Writing what is on my mind. Staying anonymous.';
   bool anonymousByDefault = true;
 
   AppState() {
@@ -89,13 +91,13 @@ class AppState extends ChangeNotifier {
         id: 'p1',
         author: 'Anjaan',
         anonymous: true,
-        mood: 'Stress',
-        text: 'Aaj office mein boss ne phir sabke saamne daanta. Ghar aakar chup reh gaya, kisi ko kya bataun.',
+        mood: 'Stressed',
+        text: 'My boss shouted at me in front of everyone again today. I came home and just stayed quiet. Who do I even tell?',
         time: '12m',
-        likes: 34,
-        reposts: 6,
+        likes: 342,
+        reposts: 58,
         comments: [
-          Comment(author: 'Anjaan', text: 'Bhai tu akela nahi hai. Kal behtar hoga.', time: '5m'),
+          Comment(author: 'Anjaan', text: 'You are not alone in this. Tomorrow will be better.', time: '5m'),
           Comment(author: 'Riya', text: 'Same boat. Stay strong.', time: '2m'),
         ],
       ),
@@ -103,70 +105,68 @@ class AppState extends ChangeNotifier {
         id: 'p2',
         author: 'Anjaan',
         anonymous: true,
-        mood: 'Gussa',
-        text: '3 saal ki mehnat, promotion phir bhi kisi aur ko mili. Andar se gussa aa raha hai.',
+        mood: 'Angry',
+        text: 'Three years of hard work, and someone else got the promotion. I am furious and nobody sees it.',
         time: '48m',
-        likes: 61,
-        reposts: 12,
+        likes: 611,
+        reposts: 124,
         comments: [
-          Comment(author: 'Anjaan', text: 'Bilkul galat hua yaar.', time: '30m'),
+          Comment(author: 'Anjaan', text: 'That is genuinely unfair.', time: '30m'),
         ],
       ),
       Post(
         id: 'p3',
         author: 'Neha',
         anonymous: false,
-        mood: 'Khushi',
-        text: 'Aaj pehli baar apne liye kuch kiya. Chhoti si baat hai, par dil khush hai.',
+        mood: 'Happy',
+        text: 'Today I did something just for myself for the first time. It is small, but it made me happy.',
         time: '2h',
-        likes: 88,
-        reposts: 9,
+        likes: 888,
+        reposts: 96,
       ),
       Post(
         id: 'p4',
         author: 'Anjaan',
         anonymous: true,
-        mood: 'Akela',
-        text: 'Raat ke 2 baje, neend nahi aa rahi. Bahut akela lag raha hai.',
+        mood: 'Lonely',
+        text: 'It is 2am and I cannot sleep. It feels really lonely in here.',
         time: '4h',
-        likes: 42,
-        reposts: 3,
+        likes: 421,
+        reposts: 33,
         comments: [
-          Comment(author: 'Anjaan', text: 'Hum yahan hain. Baat kar le.', time: '3h'),
+          Comment(author: 'Anjaan', text: 'We are here. Talk to us.', time: '3h'),
         ],
       ),
       Post(
         id: 'p5',
         author: 'Arjun',
         anonymous: false,
-        mood: 'Shukriya',
-        text: 'Mummy ke haath ka khana kha ke yaad aaya - kuch cheezein kabhi nahi badalti.',
+        mood: 'Grateful',
+        text: 'Tasted my mom\'s cooking again and it hit me - some things never change, and that is a good thing.',
         time: '6h',
-        likes: 120,
-        reposts: 21,
+        likes: 1204,
+        reposts: 211,
       ),
       Post(
         id: 'p6',
         author: 'Anjaan',
         anonymous: true,
-        mood: 'Udaas',
-        text: 'Result aa gaya, expectations se kam. Ghar mein batane ka mann nahi kar raha.',
+        mood: 'Sad',
+        text: 'Results are out and they are below what I hoped. I do not want to tell anyone at home.',
         time: '9h',
-        likes: 27,
-        reposts: 2,
+        likes: 271,
+        reposts: 22,
       ),
     ]);
 
     notifications.addAll([
-      AppNotification(text: 'Kisi ne tumhare post ko repost kiya.', time: '8m', icon: Icons.repeat),
-      AppNotification(text: 'Kisi ne tumhare post par like kiya.', time: '10m', icon: Icons.favorite),
-      AppNotification(text: 'Naya comment: "Main bhi same boat mein hoon."', time: '35m', icon: Icons.mode_comment),
-      AppNotification(text: 'Aaj ka prompt: Aaj tumhara mood kaisa hai?', time: '3h', icon: Icons.lightbulb_outline),
-      AppNotification(text: 'Tumhari 7-din ki streak ban gayi. Shabaash!', time: '1d', icon: Icons.local_fire_department),
+      AppNotification(text: 'Someone reposted your post.', time: '8m', icon: Icons.repeat),
+      AppNotification(text: 'Someone liked your post.', time: '10m', icon: Icons.favorite),
+      AppNotification(text: 'New comment: "I am in the same boat."', time: '35m', icon: Icons.mode_comment),
+      AppNotification(text: 'Today\'s prompt: How are you feeling right now?', time: '3h', icon: Icons.auto_awesome),
+      AppNotification(text: 'You hit a 7-day streak. Nice.', time: '1d', icon: Icons.local_fire_department),
     ]);
 
-    // Demo: the anonymous posts are treated as this user's, so the
-    // Instagram-style grid on the profile has something to show.
     myPosts.addAll(posts.where((x) => x.anonymous));
   }
 
@@ -177,7 +177,7 @@ class AppState extends ChangeNotifier {
       anonymous: anonymous,
       mood: mood,
       text: text,
-      time: 'abhi',
+      time: 'now',
     );
     posts.insert(0, post);
     myPosts.insert(0, post);
@@ -197,8 +197,18 @@ class AppState extends ChangeNotifier {
   }
 
   void addComment(Post post, String text) {
-    post.comments.add(Comment(author: username, text: text, time: 'abhi'));
+    post.comments.add(Comment(author: username, text: text, time: 'now'));
     notifyListeners();
+  }
+
+  /// Lightweight on-device ranking - what "the algorithm" surfaces.
+  double _score(Post p) =>
+      p.likes * 1.0 + p.reposts * 2.5 + p.comments.length * 4.0;
+
+  List<Post> get forYou {
+    final list = [...posts];
+    list.sort((a, b) => _score(b).compareTo(_score(a)));
+    return list;
   }
 
   List<Post> get trending {
@@ -206,6 +216,8 @@ class AppState extends ChangeNotifier {
     list.sort((a, b) => (b.likes + b.reposts).compareTo(a.likes + a.reposts));
     return list;
   }
+
+  List<Post> byMood(String mood) => posts.where((p) => p.mood == mood).toList();
 }
 
 final AppState appState = AppState();
