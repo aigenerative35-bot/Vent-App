@@ -14,7 +14,7 @@ const List<Color> avatarColors = [
 
 class User {
   final String id;
-  final String name;
+  String name;
   String handle;
   bool verified;
   final int colorIndex;

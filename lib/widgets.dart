@@ -296,9 +296,12 @@ class PostCard extends StatelessWidget {
                       Row(
                         children: [
                           Flexible(
-                            child: Text(post.name,
-                                maxLines: 1, overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14.5)),
+                            child: GestureDetector(
+                              onTap: post.anonymous ? null : () => onAuthor?.call(author),
+                              child: Text(post.name,
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14.5)),
+                            ),
                           ),
                           if (!post.anonymous && author.verified) ...[
                             const SizedBox(width: 4),
@@ -328,6 +331,10 @@ class PostCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (!post.anonymous && !author.isMe && onAuthor != null) ...[
+                  FollowButton(user: author),
+                  const SizedBox(width: 4),
+                ],
                 Icon(Icons.more_horiz, color: p.secondary, size: 20),
               ],
             ),

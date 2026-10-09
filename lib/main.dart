@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'ads.dart';
 import 'theme.dart';
 import 'screens.dart';
 
-void main() => runApp(const VentApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  initAds();
+  runApp(const VentApp());
+}
 
 class VentApp extends StatelessWidget {
   const VentApp({super.key});
@@ -37,6 +42,13 @@ class _RootShellState extends State<RootShell> {
     StatusScreen(),
     ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // App-open / interstitial ad shortly after launch.
+    Future.delayed(const Duration(seconds: 4), showAppOpenAd);
+  }
 
   @override
   Widget build(BuildContext context) {

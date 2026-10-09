@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'ads.dart';
 import 'theme.dart';
 import 'models.dart';
 import 'widgets.dart';
@@ -225,7 +226,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               onTag: (t) => openTopic(context, t),
               onAuthor: (u) => openUser(context, u),
             ));
-            if (i > 0 && i % 7 == 0) children.add(const SponsoredCard());
+            if (i > 0 && i % 7 == 0) children.add(const FeedAdSlot());
           }
           if (appState.hasMore) {
             children.add(const Padding(
@@ -1050,7 +1051,7 @@ class ProfileScreen extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Me'),
           actions: [
-            IconButton(onPressed: () => _open(context, const AdminPanelScreen()), icon: const Icon(Icons.insights_outlined)),
+            IconButton(onPressed: () => openStudio(context), icon: const Icon(Icons.insights_outlined)),
             IconButton(onPressed: () => _open(context, const SettingsScreen()), icon: const Icon(Icons.settings_outlined)),
             const SizedBox(width: 4),
           ],
@@ -1163,8 +1164,8 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminPanelScreen())),
-                  child: const Text('Admin panel'),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EditProfileScreen())),
+                  child: const Text('Edit profile'),
                 ),
               ),
             ],
@@ -1178,14 +1179,14 @@ class ProfileScreen extends StatelessWidget {
 
 // --------------------------------------------------------- ADMIN PANEL
 
-class AdminPanelScreen extends StatelessWidget {
-  const AdminPanelScreen({super.key});
+class StudioScreen extends StatelessWidget {
+  const StudioScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Admin panel')),
+      appBar: AppBar(title: const Text('Studio')),
       body: ListenableBuilder(
         listenable: appState,
         builder: (context, _) {
@@ -1428,6 +1429,140 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+Future<void> openStudio(BuildContext context) async {
+  await showRewardedAd();
+  if (!context.mounted) return;
+  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const StudioScreen()));
+}
+
+/// Native ad slot that blends into the feed.
+class FeedAdSlot extends StatelessWidget {
+  const FeedAdSlot({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: Block(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(gradient: Brand.gradient, borderRadius: BorderRadius.circular(11)),
+                  child: const Icon(Icons.auto_awesome, color: Colors.white, size: 19),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Sponsored', style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14)),
+                      Text('Based on your interests', style: TextStyle(color: p.secondary, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(6)),
+                  child: Text('Ad', style: TextStyle(color: p.secondary, fontSize: 11, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            nativeAdWidget(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class EditProfileScreen extends StatefulWidget {
+  const EditProfileScreen({super.key});
+
+  @override
+  State<EditProfileScreen> createState() => _EditProfileScreenState();
+}
+
+class _EditProfileScreenState extends State<EditProfileScreen> {
+  late final _name = TextEditingController(text: appState.me.name);
+  late final _handle = TextEditingController(text: appState.me.handle);
+  late final _bio = TextEditingController(text: appState.me.bio);
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _handle.dispose();
+    _bio.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    setState(() {
+      if (_name.text.trim().isNotEmpty) appState.me.name = _name.text.trim();
+      if (_handle.text.trim().isNotEmpty) appState.me.handle = _handle.text.trim();
+      appState.me.bio = _bio.text.trim();
+    });
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated')));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Edit profile'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: FilledButton(
+              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10)),
+              onPressed: _save,
+              child: const Text('Save'),
+            ),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(14),
+        children: [
+          Center(child: Avatar(label: appState.me.name, size: 88, color: Brand.blue)),
+          const SizedBox(height: 6),
+          Center(
+            child: TextButton.icon(
+              onPressed: () {
+                appState.me.handle = appState.suggestUsername(_name.text);
+                _handle.text = appState.me.handle;
+                setState(() {});
+              },
+              icon: const Icon(Icons.autorenew, size: 17),
+              label: const Text('Generate username'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text('Display name', style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14)),
+          const SizedBox(height: 6),
+          TextField(controller: _name, onChanged: (_) => setState(() {}), decoration: const InputDecoration(hintText: 'Your name')),
+          const SizedBox(height: 16),
+          Text('Username', style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14)),
+          const SizedBox(height: 6),
+          TextField(controller: _handle, decoration: const InputDecoration(hintText: '@username')),
+          const SizedBox(height: 16),
+          Text('Bio', style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14)),
+          const SizedBox(height: 6),
+          TextField(controller: _bio, maxLines: 3, decoration: const InputDecoration(hintText: 'About you')),
+        ],
       ),
     );
   }
