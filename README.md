@@ -1,26 +1,28 @@
 # Vent
 
-Vent is a Flutter social app where people share short, anonymous posts about how
-they feel, and others like, comment and share them.
+Vent is a Flutter social app where people share short, anonymous text posts about
+how they feel, and others can view, comment (with replies), **Lift** (repost) and
+like them.
 
-The UI follows a Facebook-style layout: a blue top bar with search, a
-"What is on your mind?" create box, a Stories row, posts with
-Like / Comment / Share, and a cover-photo profile with tabs. Light and dark
-themes are both supported. All UI text is in English.
+The UI is a Weibo-style layout in blue: a top bar with search, tabs
+(For You / Latest / Hot), an AI "Recommended for you" feed, posts with view /
+comment / lift / like counts, an infinite feed that loads more as you scroll, and
+a 24-hour photo **Status**. Light and dark themes are both supported. All UI text
+is in English.
 
-This version runs on **local demo data** (no backend yet), so it builds and runs
-immediately. Firebase (Auth + Firestore) will replace the in-memory store later;
-the UI only talks to `AppState`, so the swap stays contained.
+This version runs on **local demo data** (no backend yet). Firebase (Auth +
+Firestore) will replace the in-memory store; the UI only talks to `AppState`, so
+the swap stays contained.
 
 ## What works now
 
-- Home: create box, Stories row, "Suggested for you" (AI-ranked) and Latest feed
-- Friends: people you may know, with Add friend / Friends toggle
-- Watch: trending posts
-- Notifications: activity feed
-- Compose: public post with mood tags and an anonymous toggle
-- Post detail with comments and a comment composer
-- Profile: cover photo, avatar, friends count, tabs (Posts / About / Friends / Photos)
+- Home: create box, Status row, AI "Recommended for you" + Latest + Hot tabs
+- Infinite scroll: the feed loads more posts as you scroll (pagination)
+- Posts show **views**, **comments**, **Lifts** (reposts) and **likes**
+- Comments support **replies** (nested) and comment likes
+- **Status**: add a photo status that disappears after 24 hours
+- Discover: search + hot posts
+- Notifications, and a cover-photo profile (Posts / Status / About)
 - Follows the system light / dark setting
 
 ## Run
@@ -35,13 +37,14 @@ Build an APK:
 ## Project layout
 
 - `lib/main.dart` - app entry, bottom-nav shell
-- `lib/theme.dart` - brand colours, palettes, theme, FbCard
-- `lib/models.dart` - models + in-memory AppState (demo data, AI ranking)
-- `lib/widgets.dart` - Avatar, PostCard, ActionRow, StoryCircle, etc.
+- `lib/theme.dart` - brand blue, palettes, theme, Block
+- `lib/models.dart` - models + in-memory AppState (demo data, pagination, statuses)
+- `lib/widgets.dart` - Avatar, PostCard, CommentTile, StatusRing, etc.
 - `lib/screens.dart` - all screens
 - `.github/workflows/flutter.yml` - CI that builds the APK
 
 ## Notes
 
 - The app name is a working name and can change.
+- Posts are text only; photos live in the 24-hour Status.
 - Android + web platforms are enabled (one codebase, later a website).

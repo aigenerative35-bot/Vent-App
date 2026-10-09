@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
 
-/// Facebook-style brand colours.
+/// Brand blue (Weibo-style layout, blue theme).
 class Brand {
-  static const blue = Color(0xFF1877F2);
-  static const blueDark = Color(0xFF0A66C2);
-  static const green = Color(0xFF42B72A);
-  static const red = Color(0xFFF02849);
+  static const blue = Color(0xFF1E7BFF);
+  static const blueDark = Color(0xFF0B5CD6);
+  static const green = Color(0xFF12B76A);
+  static const red = Color(0xFFEF4444);
+  static const amber = Color(0xFFF59E0B);
 
   static const gradient = LinearGradient(
-    colors: [Color(0xFF1877F2), Color(0xFF4B9BFF)],
+    colors: [Color(0xFF1E7BFF), Color(0xFF4DA3FF)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const cover = LinearGradient(
-    colors: [Color(0xFF1877F2), Color(0xFF6BB6FF)],
+    colors: [Color(0xFF0B5CD6), Color(0xFF4DA3FF)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -40,29 +41,39 @@ class Palette {
   });
 
   static const dark = Palette(
-    bg: Color(0xFF18191A),
-    surface: Color(0xFF242526),
-    surfaceAlt: Color(0xFF3A3B3C),
-    text: Color(0xFFE4E6EB),
-    secondary: Color(0xFFB0B3B8),
-    border: Color(0xFF3E4042),
-    divider: Color(0xFF3E4042),
+    bg: Color(0xFF0F1218),
+    surface: Color(0xFF171B23),
+    surfaceAlt: Color(0xFF1F2530),
+    text: Color(0xFFE9EDF3),
+    secondary: Color(0xFF98A2B3),
+    border: Color(0xFF262C38),
+    divider: Color(0xFF232936),
   );
 
   static const light = Palette(
-    bg: Color(0xFFF0F2F5),
+    bg: Color(0xFFF5F7FA),
     surface: Color(0xFFFFFFFF),
-    surfaceAlt: Color(0xFFF0F2F5),
-    text: Color(0xFF050505),
-    secondary: Color(0xFF65676B),
-    border: Color(0xFFE4E6EB),
-    divider: Color(0xFFE4E6EB),
+    surfaceAlt: Color(0xFFF0F3F8),
+    text: Color(0xFF10131A),
+    secondary: Color(0xFF6B7280),
+    border: Color(0xFFE8EBF0),
+    divider: Color(0xFFEDF0F5),
   );
 
   bool get isDark => identical(this, dark);
 
   static Palette of(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark ? dark : light;
+
+  List<BoxShadow> get shadow => isDark
+      ? const []
+      : [
+          BoxShadow(
+            color: const Color(0xFF10131A).withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ];
 }
 
 ThemeData appTheme(Brightness brightness) {
@@ -72,10 +83,8 @@ ThemeData appTheme(Brightness brightness) {
     useMaterial3: true,
     brightness: brightness,
     scaffoldBackgroundColor: p.bg,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: Brand.blue,
-      brightness: brightness,
-    ).copyWith(primary: Brand.blue, surface: p.surface, onSurface: p.text),
+    colorScheme: ColorScheme.fromSeed(seedColor: Brand.blue, brightness: brightness)
+        .copyWith(primary: Brand.blue, surface: p.surface, onSurface: p.text),
     appBarTheme: AppBarTheme(
       backgroundColor: p.surface,
       foregroundColor: p.text,
@@ -90,43 +99,39 @@ ThemeData appTheme(Brightness brightness) {
       labelColor: Brand.blue,
       unselectedLabelColor: p.secondary,
       indicatorColor: Brand.blue,
-      indicatorSize: TabBarIndicatorSize.tab,
+      indicatorSize: TabBarIndicatorSize.label,
       dividerColor: p.divider,
-      labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+      labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
+      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: p.surfaceAlt,
       hintStyle: TextStyle(color: p.secondary),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(22),
-        borderSide: BorderSide.none,
-      ),
+          borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(22),
-        borderSide: BorderSide.none,
-      ),
+          borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: Brand.blue, width: 1.4),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: Brand.blue,
         foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: p.text,
         side: BorderSide(color: p.border),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
       ),
@@ -134,21 +139,37 @@ ThemeData appTheme(Brightness brightness) {
   );
 }
 
-/// A flat Facebook-style card block.
-class FbCard extends StatelessWidget {
+/// A rounded surface block.
+class Block extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final VoidCallback? onTap;
-  const FbCard({super.key, required this.child, this.padding = EdgeInsets.zero, this.onTap});
+  final Gradient? gradient;
+  final Color? color;
+  const Block({
+    super.key,
+    required this.child,
+    this.padding = EdgeInsets.zero,
+    this.onTap,
+    this.gradient,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     return Container(
-      color: p.surface,
+      decoration: BoxDecoration(
+        color: gradient == null ? (color ?? p.surface) : null,
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: gradient == null ? p.border : Colors.transparent),
+        boxShadow: p.shadow,
+      ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
+          borderRadius: BorderRadius.circular(16),
           onTap: onTap,
           child: Padding(padding: padding, child: child),
         ),

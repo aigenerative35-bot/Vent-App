@@ -1,40 +1,128 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'theme.dart';
 import 'models.dart';
 import 'widgets.dart';
 
 void openPost(BuildContext context, Post post) {
-  Navigator.of(context).push(
-    MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
-  );
+  Navigator.of(context).push(MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)));
 }
 
 void openCompose(BuildContext context) {
-  Navigator.of(context).push(
-    MaterialPageRoute(builder: (_) => const ComposeScreen()),
+  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ComposeScreen()));
+}
+
+Future<void> pickStatus(BuildContext context) async {
+  final picker = ImagePicker();
+  final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+  if (file == null) return;
+  final bytes = await file.readAsBytes();
+  appState.addStatus(imageBytes: bytes);
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Status added - it disappears in 24 hours')),
+    );
+  }
+}
+
+void openStatus(BuildContext context, Status status) {
+  final p = Palette.of(context);
+  final grad = statusGradients[status.gradientIndex % statusGradients.length];
+  final h = status.remaining.inHours;
+  showDialog(
+    context: context,
+    barrierColor: Colors.black87,
+    builder: (context) => Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: AspectRatio(
+              aspectRatio: 3 / 4,
+              child: status.imageBytes != null
+                  ? Image.memory(status.imageBytes!, fit: BoxFit.cover)
+                  : Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: grad),
+                      ),
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.all(24),
+                      child: Text(status.caption.isEmpty ? status.author : status.caption,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text('${status.author}  ·  expires in ${h}h',
+              style: TextStyle(color: p.surface, fontSize: 13)),
+        ],
+      ),
+    ),
   );
 }
 
 // ---------------------------------------------------------------- HOME
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  late final TabController _tab = TabController(length: 3, vsync: this);
+  final _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 500) {
+        appState.loadMore();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  List<Post> _list() {
+    switch (_tab.index) {
+      case 0:
+        return appState.forYouFeed;
+      case 1:
+        return appState.feed;
+      default:
+        return appState.hotFeed;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 12,
+        titleSpacing: 14,
         title: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(color: Brand.blue, shape: BoxShape.circle),
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                  gradient: Brand.gradient, borderRadius: BorderRadius.circular(9)),
               alignment: Alignment.center,
               child: const Text('V',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -42,9 +130,7 @@ class HomeScreen extends StatelessWidget {
                 height: 38,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
-                  color: p.surfaceAlt,
-                  borderRadius: BorderRadius.circular(20),
-                ),
+                    color: p.surfaceAlt, borderRadius: BorderRadius.circular(19)),
                 child: Row(
                   children: [
                     Icon(Icons.search, size: 18, color: p.secondary),
@@ -60,28 +146,43 @@ class HomeScreen extends StatelessWidget {
           IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none)),
           const SizedBox(width: 4),
         ],
+        bottom: TabBar(
+          controller: _tab,
+          onTap: (_) => setState(() {}),
+          tabs: const [Tab(text: 'For You'), Tab(text: 'Latest'), Tab(text: 'Hot')],
+        ),
       ),
       body: ListenableBuilder(
         listenable: appState,
         builder: (context, _) {
-          final rec = appState.forYou.take(2).toList();
-          final recIds = rec.map((e) => e.id).toSet();
-          final rest = appState.posts.where((e) => !recIds.contains(e.id)).toList();
+          final list = _list();
           return ListView(
-            padding: EdgeInsets.zero,
+            controller: _scroll,
+            padding: const EdgeInsets.only(top: 10, bottom: 20),
             children: [
-              const SizedBox(height: 8),
-              const CreateBox(),
-              const SizedBox(height: 8),
-              const StoriesRow(),
-              const SizedBox(height: 4),
-              const SectionHeader(
-                  icon: Icons.auto_awesome, title: 'Suggested for you', subtitle: 'Picked for you'),
-              ...rec.map((post) => PostCard(post: post, onTap: () => openPost(context, post))),
-              const SizedBox(height: 8),
-              const SectionHeader(title: 'Latest'),
-              ...rest.map((post) => PostCard(post: post, onTap: () => openPost(context, post))),
-              const SizedBox(height: 20),
+              if (_tab.index == 0) ...[
+                const CreateBox(),
+                const SizedBox(height: 12),
+                const StatusRow(),
+                const SectionHeader(
+                    icon: Icons.auto_awesome,
+                    title: 'Recommended for you',
+                    subtitle: 'AI picked'),
+              ],
+              ...list.map((post) => PostCard(post: post, onTap: () => openPost(context, post))),
+              if (appState.hasMore)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Text('You are all caught up',
+                        style: TextStyle(color: p.secondary, fontSize: 12.5)),
+                  ),
+                ),
             ],
           );
         },
@@ -96,159 +197,110 @@ class CreateBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
-    return FbCard(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-        child: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Block(
+        onTap: () => openCompose(context),
+        padding: const EdgeInsets.all(14),
+        child: Row(
           children: [
-            Row(
-              children: [
-                const Avatar(label: 'A'),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: InkWell(
-                    onTap: () => openCompose(context),
-                    borderRadius: BorderRadius.circular(22),
-                    child: Container(
-                      height: 42,
-                      alignment: Alignment.centerLeft,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: p.surfaceAlt,
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      child: Text('What is on your mind, Anjaan?',
-                          style: TextStyle(color: p.secondary, fontSize: 15)),
-                    ),
-                  ),
-                ),
-              ],
+            const Avatar(label: 'A', color: Brand.blue),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text('What is on your mind?',
+                  style: TextStyle(color: p.secondary, fontSize: 15)),
             ),
-            const SizedBox(height: 8),
-            Divider(height: 1, color: p.divider),
-            const SizedBox(height: 2),
-            Row(
-              children: [
-                Expanded(child: _quick(context, Icons.videocam_outlined, 'Live', Brand.red)),
-                Expanded(child: _quick(context, Icons.photo_library_outlined, 'Photo', Brand.green)),
-                Expanded(
-                    child: _quick(context, Icons.emoji_emotions_outlined, 'Feeling',
-                        const Color(0xFFF7B928))),
-              ],
-            ),
+            const Icon(Icons.edit_outlined, size: 20, color: Brand.blue),
           ],
         ),
       ),
     );
   }
-
-  Widget _quick(BuildContext context, IconData icon, String label, Color color) {
-    final p = Palette.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 19, color: color),
-          const SizedBox(width: 7),
-          Text(label,
-              style: TextStyle(color: p.secondary, fontSize: 13.5, fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
 }
 
-class StoriesRow extends StatelessWidget {
-  const StoriesRow({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final people = appState.people;
-    return SizedBox(
-      height: 106,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        children: [
-          const StoryCircle(label: 'Create story', add: true),
-          ...people.map((person) => Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: StoryCircle(label: person.name.split(' ').first, color: Brand.blueDark),
-              )),
-        ],
-      ),
-    );
-  }
-}
-
-// ------------------------------------------------------------- FRIENDS
-
-class FriendsScreen extends StatelessWidget {
-  const FriendsScreen({super.key});
+class StatusRow extends StatelessWidget {
+  const StatusRow({super.key});
 
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
+    final statuses = appState.activeStatuses;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+          child: Row(
+            children: [
+              Text('Status',
+                  style: TextStyle(color: p.text, fontSize: 16, fontWeight: FontWeight.w800)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('disappears after 24 hours',
+                    style: TextStyle(color: p.secondary, fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 104,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            children: [
+              StatusRing(
+                label: 'Add status',
+                add: true,
+                onTap: () => pickStatus(context),
+              ),
+              ...statuses.map(
+                (s) => Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: StatusRing(
+                    label: s.author,
+                    imageBytes: s.imageBytes,
+                    gradient: LinearGradient(
+                        colors: statusGradients[s.gradientIndex % statusGradients.length]),
+                    onTap: () => openStatus(context, s),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ------------------------------------------------------------ DISCOVER
+
+class DiscoverScreen extends StatelessWidget {
+  const DiscoverScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Friends')),
+      appBar: AppBar(title: const Text('Discover')),
       body: ListenableBuilder(
         listenable: appState,
         builder: (context, _) {
           return ListView(
-            padding: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.only(top: 10, bottom: 20),
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-                child: Text('People you may know',
-                    style: TextStyle(color: p.text, fontSize: 16, fontWeight: FontWeight.w800)),
-              ),
-              ...appState.people.map(
-                (person) => Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-                  child: FbCard(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Avatar(label: person.name, size: 52),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(person.name,
-                                    style: TextStyle(
-                                        color: p.text,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 15)),
-                                const SizedBox(height: 2),
-                                Text(person.mutual,
-                                    style: TextStyle(color: p.secondary, fontSize: 12.5)),
-                              ],
-                            ),
-                          ),
-                          person.friend
-                              ? OutlinedButton(
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                  ),
-                                  onPressed: () => appState.toggleFriend(person),
-                                  child: const Text('Friends'),
-                                )
-                              : FilledButton(
-                                  style: FilledButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                                  ),
-                                  onPressed: () => appState.toggleFriend(person),
-                                  child: const Text('Add friend'),
-                                ),
-                        ],
-                      ),
-                    ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(14, 4, 14, 6),
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search posts, moods, people...',
+                    prefixIcon: Icon(Icons.search, size: 20),
                   ),
                 ),
               ),
+              const SectionHeader(icon: Icons.local_fire_department, title: 'Hot right now'),
+              ...appState.trending
+                  .take(12)
+                  .map((post) => PostCard(post: post, onTap: () => openPost(context, post))),
             ],
           );
         },
@@ -257,24 +309,106 @@ class FriendsScreen extends StatelessWidget {
   }
 }
 
-// --------------------------------------------------------------- WATCH
+// -------------------------------------------------------------- STATUS
 
-class WatchScreen extends StatelessWidget {
-  const WatchScreen({super.key});
+class StatusScreen extends StatelessWidget {
+  const StatusScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final p = Palette.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Watch')),
+      appBar: AppBar(title: const Text('Status')),
       body: ListenableBuilder(
         listenable: appState,
         builder: (context, _) {
+          final statuses = appState.activeStatuses;
           return ListView(
-            padding: const EdgeInsets.only(top: 8, bottom: 20),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
             children: [
-              const SectionHeader(icon: Icons.trending_up, title: 'Trending now'),
-              ...appState.trending
-                  .map((post) => PostCard(post: post, onTap: () => openPost(context, post))),
+              Block(
+                onTap: () => pickStatus(context),
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: Brand.gradient,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.add, color: Colors.white),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Add a photo status',
+                              style: TextStyle(
+                                  color: p.text, fontSize: 15, fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 2),
+                          Text('It stays for 24 hours, then deletes itself',
+                              style: TextStyle(color: p.secondary, fontSize: 12.5)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Recent statuses',
+                  style: TextStyle(color: p.text, fontSize: 16, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 10),
+              if (statuses.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: EmptyState(icon: Icons.auto_stories_outlined, message: 'No statuses right now.'),
+                ),
+              ...statuses.map(
+                (s) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Block(
+                    onTap: () => openStatus(context, s),
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: SizedBox(
+                            width: 60,
+                            height: 60,
+                            child: s.imageBytes != null
+                                ? Image.memory(s.imageBytes!, fit: BoxFit.cover)
+                                : Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(colors: statusGradients[
+                                          s.gradientIndex % statusGradients.length]),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(s.author,
+                                  style: TextStyle(
+                                      color: p.text, fontSize: 14.5, fontWeight: FontWeight.w800)),
+                              const SizedBox(height: 3),
+                              Text('Expires in ${s.remaining.inHours}h ${s.remaining.inMinutes % 60}m',
+                                  style: TextStyle(color: Brand.blue, fontSize: 12.5)),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: p.secondary),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
           );
         },
@@ -297,47 +431,37 @@ class NotificationsScreen extends StatelessWidget {
         listenable: appState,
         builder: (context, _) {
           return ListView(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
             children: appState.notifications
                 .map(
                   (n) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: FbCard(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            Stack(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Block(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                                gradient: Brand.gradient,
+                                borderRadius: BorderRadius.circular(12)),
+                            child: Icon(n.icon, size: 20, color: Colors.white),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Avatar(label: 'A', size: 44),
-                                Positioned(
-                                  right: 0,
-                                  bottom: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(3),
-                                    decoration: BoxDecoration(
-                                        color: Brand.blue, shape: BoxShape.circle),
-                                    child: Icon(n.icon, size: 11, color: Colors.white),
-                                  ),
-                                ),
+                                Text(n.text,
+                                    style: TextStyle(color: p.text, fontSize: 14, height: 1.3)),
+                                const SizedBox(height: 3),
+                                Text(n.time,
+                                    style: TextStyle(color: Brand.blue, fontSize: 12)),
                               ],
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(n.text,
-                                      style: TextStyle(
-                                          color: p.text, fontSize: 14, height: 1.3)),
-                                  const SizedBox(height: 3),
-                                  Text(n.time,
-                                      style: TextStyle(color: Brand.blue, fontSize: 12)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -383,62 +507,52 @@ class _ComposeScreenState extends State<ComposeScreen> {
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Create post')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
-        children: [
-          FbCard(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Avatar(label: _anonymous ? 'A' : appState.username[0],
-                          color: _anonymous ? p.secondary : Brand.blue),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(_anonymous ? 'Anjaan' : appState.username,
-                              style: TextStyle(
-                                  color: p.text, fontWeight: FontWeight.w700, fontSize: 14.5)),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                    color: p.surfaceAlt,
-                                    borderRadius: BorderRadius.circular(4)),
-                                child: Text('Public',
-                                    style: TextStyle(color: p.secondary, fontSize: 11)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  TextField(
-                    controller: _controller,
-                    onChanged: (_) => setState(() {}),
-                    maxLines: 7,
-                    maxLength: 300,
-                    style: TextStyle(color: p.text, fontSize: 17, height: 1.4),
-                    decoration: const InputDecoration(
-                      hintText: 'What is on your mind?',
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: false,
-                      counterText: '',
-                    ),
-                  ),
-                ],
-              ),
+      appBar: AppBar(
+        title: const Text('Create post'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10)),
+              onPressed: _controller.text.trim().isEmpty ? null : _submit,
+              child: const Text('Post'),
             ),
           ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+        children: [
+          Row(
+            children: [
+              Avatar(
+                  label: _anonymous ? 'A' : appState.username[0],
+                  color: _anonymous ? p.secondary : Brand.blue),
+              const SizedBox(width: 10),
+              Text(_anonymous ? 'Anjaan' : appState.username,
+                  style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 15)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _controller,
+            onChanged: (_) => setState(() {}),
+            maxLines: 8,
+            maxLength: 300,
+            autofocus: true,
+            style: TextStyle(color: p.text, fontSize: 18, height: 1.45),
+            decoration: const InputDecoration(
+              hintText: 'What is on your mind?',
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              filled: false,
+              counterText: '',
+            ),
+          ),
+          const SizedBox(height: 6),
+          Divider(color: p.divider),
           const SizedBox(height: 14),
           Text('Add a mood',
               style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w800)),
@@ -453,7 +567,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                 label: Text(m),
                 selected: selected,
                 onSelected: (_) => setState(() => _mood = m),
-                selectedColor: c.withValues(alpha: 0.18),
+                selectedColor: c.withValues(alpha: 0.16),
                 labelStyle: TextStyle(
                     color: selected ? c : p.secondary,
                     fontWeight: FontWeight.w700,
@@ -464,8 +578,9 @@ class _ComposeScreenState extends State<ComposeScreen> {
               );
             }).toList(),
           ),
-          const SizedBox(height: 14),
-          FbCard(
+          const SizedBox(height: 16),
+          Block(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
             child: SwitchListTile(
               value: _anonymous,
               onChanged: (v) => setState(() => _anonymous = v),
@@ -475,14 +590,9 @@ class _ComposeScreenState extends State<ComposeScreen> {
                   style: TextStyle(color: p.secondary, fontSize: 12.5)),
             ),
           ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _controller.text.trim().isEmpty ? null : _submit,
-              child: const Text('Post'),
-            ),
-          ),
+          const SizedBox(height: 8),
+          Text('Posts are text only. Use Status for photos.',
+              style: TextStyle(color: p.secondary, fontSize: 12)),
         ],
       ),
     );
@@ -501,6 +611,7 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final _controller = TextEditingController();
+  Comment? _replyTo;
 
   @override
   void dispose() {
@@ -511,8 +622,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   void _send() {
     final t = _controller.text.trim();
     if (t.isEmpty) return;
-    appState.addComment(widget.post, t);
+    if (_replyTo != null) {
+      appState.addReply(_replyTo!, t);
+    } else {
+      appState.addComment(widget.post, t);
+    }
     _controller.clear();
+    setState(() => _replyTo = null);
     FocusScope.of(context).unfocus();
   }
 
@@ -529,70 +645,26 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             children: [
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.only(top: 10),
                   children: [
                     PostCard(post: post, onTap: () {}),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
-                      child: Text('Comments',
-                          style: TextStyle(
-                              color: p.text, fontSize: 15.5, fontWeight: FontWeight.w800)),
-                    ),
+                    const SectionHeader(title: 'Comments'),
                     if (post.comments.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 24),
                         child: EmptyState(
-                            icon: Icons.chat_bubble_outline,
-                            message: 'No comments yet. Be the first.'),
+                            icon: Icons.chat_bubble_outline, message: 'No comments yet.'),
                       ),
                     ...post.comments.map(
                       (c) => Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                        child: FbCard(
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Avatar(label: c.author, size: 36),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: p.surfaceAlt,
-                                          borderRadius: BorderRadius.circular(14),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(c.author,
-                                                style: TextStyle(
-                                                    color: p.text,
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: 13)),
-                                            const SizedBox(height: 2),
-                                            Text(c.text,
-                                                style: TextStyle(
-                                                    color: p.text,
-                                                    fontSize: 14,
-                                                    height: 1.35)),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(c.time,
-                                          style: TextStyle(color: p.secondary, fontSize: 11.5)),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+                        child: CommentTile(
+                          comment: c,
+                          onReply: () {
+                            setState(() => _replyTo = c);
+                            FocusScope.of(context).requestFocus(FocusNode());
+                          },
+                          onLike: () => appState.toggleCommentLike(c),
                         ),
                       ),
                     ),
@@ -604,20 +676,42 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 top: false,
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                  color: p.surface,
-                  child: Row(
+                  decoration: BoxDecoration(
+                    color: p.surface,
+                    border: Border(top: BorderSide(color: p.divider)),
+                  ),
+                  child: Column(
                     children: [
-                      const Avatar(label: 'A', size: 36),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: _controller,
-                          decoration: const InputDecoration(hintText: 'Write a comment...'),
+                      if (_replyTo != null)
+                        Row(
+                          children: [
+                            Text('Replying to ${_replyTo!.author}',
+                                style: TextStyle(color: Brand.blue, fontSize: 12)),
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: () => setState(() => _replyTo = null),
+                              child: Text('Cancel',
+                                  style: TextStyle(color: p.secondary, fontSize: 12)),
+                            ),
+                          ],
                         ),
+                      Row(
+                        children: [
+                          const Avatar(label: 'A', size: 36, color: Brand.blue),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              controller: _controller,
+                              decoration: InputDecoration(
+                                  hintText:
+                                      _replyTo == null ? 'Write a comment...' : 'Write a reply...'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton.filled(
+                              onPressed: _send, icon: const Icon(Icons.send_rounded, size: 18)),
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      IconButton.filled(
-                          onPressed: _send, icon: const Icon(Icons.send_rounded, size: 18)),
                     ],
                   ),
                 ),
@@ -639,21 +733,19 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     return DefaultTabController(
-      length: 4,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Profile'),
+          title: const Text('Me'),
           actions: [
-            IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
+            IconButton(onPressed: () {}, icon: const Icon(Icons.settings_outlined)),
             const SizedBox(width: 4),
           ],
         ),
         body: Column(
           children: [
             _header(context, p),
-            const TabBar(
-              tabs: [Tab(text: 'Posts'), Tab(text: 'About'), Tab(text: 'Friends'), Tab(text: 'Photos')],
-            ),
+            const TabBar(tabs: [Tab(text: 'Posts'), Tab(text: 'Status'), Tab(text: 'About')]),
             Expanded(
               child: TabBarView(
                 children: [
@@ -663,11 +755,10 @@ class ProfileScreen extends StatelessWidget {
                       final mine = appState.myPosts;
                       if (mine.isEmpty) {
                         return const EmptyState(
-                            icon: Icons.edit_note,
-                            message: 'No posts yet. Tap the create box to write one.');
+                            icon: Icons.edit_note, message: 'No posts yet.');
                       }
                       return ListView(
-                        padding: const EdgeInsets.only(top: 8, bottom: 20),
+                        padding: const EdgeInsets.only(top: 10, bottom: 20),
                         children: mine
                             .map((post) =>
                                 PostCard(post: post, onTap: () => openPost(context, post)))
@@ -675,9 +766,52 @@ class ProfileScreen extends StatelessWidget {
                       );
                     },
                   ),
-                  _about(context, p),
-                  _friends(context, p),
-                  const EmptyState(icon: Icons.photo_library_outlined, message: 'No photos yet.'),
+                  ListenableBuilder(
+                    listenable: appState,
+                    builder: (context, _) {
+                      final mine = appState.activeStatuses
+                          .where((s) => s.author == appState.username)
+                          .toList();
+                      if (mine.isEmpty) {
+                        return const EmptyState(
+                            icon: Icons.auto_stories_outlined,
+                            message: 'No status yet. Add one from the Status tab.');
+                      }
+                      return ListView(
+                        padding: const EdgeInsets.all(14),
+                        children: mine
+                            .map((s) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Block(
+                                    onTap: () => openStatus(context, s),
+                                    padding: const EdgeInsets.all(12),
+                                    child: Text(
+                                        'Status · expires in ${s.remaining.inHours}h',
+                                        style: TextStyle(color: p.text, fontSize: 14)),
+                                  ),
+                                ))
+                            .toList(),
+                      );
+                    },
+                  ),
+                  ListView(
+                    children: [
+                      ListTile(
+                        leading: Icon(Icons.info_outline, color: p.secondary),
+                        title: Text(appState.bio, style: TextStyle(color: p.text, fontSize: 14)),
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.calendar_today_outlined, color: p.secondary),
+                        title: Text('Joined October 2026',
+                            style: TextStyle(color: p.text, fontSize: 14)),
+                      ),
+                      ListTile(
+                        leading: Icon(Icons.local_fire_department_outlined, color: p.secondary),
+                        title: Text('${appState.streak}-day streak',
+                            style: TextStyle(color: p.text, fontSize: 14)),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -702,7 +836,7 @@ class ProfileScreen extends StatelessWidget {
                 child: Center(
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(shape: BoxShape.circle, color: p.surface),
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: p.bg),
                     child: const Avatar(label: 'A', size: 96),
                   ),
                 ),
@@ -714,8 +848,8 @@ class ProfileScreen extends StatelessWidget {
         Text(appState.username,
             style: TextStyle(color: p.text, fontSize: 22, fontWeight: FontWeight.w800)),
         const SizedBox(height: 2),
-        Text('${appState.friends} friends',
-            style: TextStyle(color: p.secondary, fontSize: 13.5)),
+        Text('${appState.following} following  ·  ${appState.friends} followers',
+            style: TextStyle(color: p.secondary, fontSize: 13)),
         const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -724,66 +858,19 @@ class ProfileScreen extends StatelessWidget {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: () => openCompose(context),
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Add to story'),
+                  icon: const Icon(Icons.edit_outlined, size: 17),
+                  label: const Text('New post'),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: OutlinedButton(
-                  onPressed: () {},
-                  child: const Text('Edit profile'),
-                ),
+                child: OutlinedButton(onPressed: () {}, child: const Text('Edit profile')),
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
       ],
-    );
-  }
-
-  Widget _about(BuildContext context, Palette p) {
-    Widget row(IconData icon, String text) => Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-          child: Row(
-            children: [
-              Icon(icon, size: 20, color: p.secondary),
-              const SizedBox(width: 12),
-              Expanded(child: Text(text, style: TextStyle(color: p.text, fontSize: 14))),
-            ],
-          ),
-        );
-    return ListView(
-      children: [
-        row(Icons.info_outline, appState.bio),
-        row(Icons.calendar_today_outlined, 'Joined October 2026'),
-        row(Icons.location_on_outlined, 'Lives in India'),
-        row(Icons.local_fire_department_outlined, '${appState.streak}-day streak'),
-      ],
-    );
-  }
-
-  Widget _friends(BuildContext context, Palette p) {
-    return ListView(
-      children: appState.people
-          .map(
-            (person) => Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              child: Row(
-                children: [
-                  Avatar(label: person.name, size: 46),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(person.name,
-                        style: TextStyle(
-                            color: p.text, fontSize: 14.5, fontWeight: FontWeight.w600)),
-                  ),
-                ],
-              ),
-            ),
-          )
-          .toList(),
     );
   }
 }

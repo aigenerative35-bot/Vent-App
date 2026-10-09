@@ -32,8 +32,8 @@ class _RootShellState extends State<RootShell> {
 
   static const _screens = <Widget>[
     HomeScreen(),
-    FriendsScreen(),
-    WatchScreen(),
+    DiscoverScreen(),
+    StatusScreen(),
     NotificationsScreen(),
     ProfileScreen(),
   ];
@@ -57,8 +57,8 @@ class _BottomBar extends StatelessWidget {
     final p = Palette.of(context);
     const items = <List<IconData>>[
       [Icons.home_outlined, Icons.home_rounded],
-      [Icons.people_outline, Icons.people_rounded],
-      [Icons.ondemand_video_outlined, Icons.ondemand_video_rounded],
+      [Icons.explore_outlined, Icons.explore_rounded],
+      [Icons.auto_stories_outlined, Icons.auto_stories_rounded],
       [Icons.notifications_none, Icons.notifications_rounded],
       [Icons.person_outline, Icons.person_rounded],
     ];
@@ -79,7 +79,7 @@ class _BottomBar extends StatelessWidget {
                   onTap: () => onTap(i),
                   child: Icon(
                     selected ? items[i][1] : items[i][0],
-                    size: 28,
+                    size: 27,
                     color: selected ? Brand.blue : p.secondary,
                   ),
                 ),
