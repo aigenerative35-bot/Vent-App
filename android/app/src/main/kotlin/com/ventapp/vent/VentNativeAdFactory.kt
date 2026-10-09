@@ -5,13 +5,13 @@ import android.view.LayoutInflater
 import android.widget.TextView
 import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdView
-import io.flutter.plugins.googlemobileads.GoogleMobileAdsPlugin
+import io.flutter.plugins.googlemobileads.NativeAdFactory
 
 /// Renders a Google native ad into a layout that looks like a feed post.
-class VentNativeAdFactory(private val context: Context) : GoogleMobileAdsPlugin.NativeAdFactory {
+class VentNativeAdFactory(private val context: Context) : NativeAdFactory {
     override fun createNativeAd(
         nativeAd: NativeAd,
-        customOptions: MutableMap<String, Any>?
+        customOptions: Map<String, Any>?
     ): NativeAdView {
         val adView = LayoutInflater.from(context)
             .inflate(R.layout.native_ad, null) as NativeAdView
