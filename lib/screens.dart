@@ -12,6 +12,15 @@ void openCompose(BuildContext context) {
   Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ComposeScreen()));
 }
 
+void openUser(BuildContext context, User user) {
+  if (user.isMe) return;
+  Navigator.of(context).push(MaterialPageRoute(builder: (_) => UserProfileScreen(user: user)));
+}
+
+void openTopic(BuildContext context, String tag) {
+  Navigator.of(context).push(MaterialPageRoute(builder: (_) => TopicScreen(tag: tag)));
+}
+
 Future<void> pickStatus(BuildContext context) async {
   final picker = ImagePicker();
   final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
@@ -45,21 +54,65 @@ void openStatus(BuildContext context, Status status) {
               child: status.imageBytes != null
                   ? Image.memory(status.imageBytes!, fit: BoxFit.cover)
                   : Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(colors: grad),
-                      ),
+                      decoration: BoxDecoration(gradient: LinearGradient(colors: grad)),
                       alignment: Alignment.center,
                       padding: const EdgeInsets.all(24),
                       child: Text(status.caption.isEmpty ? status.author : status.caption,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
                     ),
             ),
           ),
           const SizedBox(height: 12),
-          Text('${status.author}  ·  expires in ${h}h',
-              style: TextStyle(color: p.surface, fontSize: 13)),
+          Text('${status.author}  ·  expires in ${h}h', style: TextStyle(color: p.surface, fontSize: 13)),
+        ],
+      ),
+    ),
+  );
+}
+
+void shareSheet(BuildContext context, Post post) {
+  final p = Palette.of(context);
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: p.surface,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (context) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 10),
+          Text('Share', style: TextStyle(color: p.text, fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          ListTile(
+            leading: Icon(Icons.people_alt_outlined, color: Brand.blue),
+            title: Text('Share to my followers', style: TextStyle(color: p.text)),
+            onTap: () {
+              appState.share(post);
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shared to your followers')));
+            },
+          ),
+          ...appState.groups.map(
+            (g) => ListTile(
+              leading: Icon(Icons.groups_outlined, color: Brand.blue),
+              title: Text('Share to ${g.name}', style: TextStyle(color: p.text)),
+              onTap: () {
+                appState.share(post, toGroup: g.id);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Shared to ${g.name}')));
+              },
+            ),
+          ),
+          ListTile(
+            leading: Icon(Icons.link, color: Brand.blue),
+            title: Text('Copy link', style: TextStyle(color: p.text)),
+            onTap: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied')));
+            },
+          ),
+          const SizedBox(height: 8),
         ],
       ),
     ),
@@ -99,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   List<Post> _list() {
     switch (_tab.index) {
       case 0:
-        return appState.forYouFeed;
+        return appState.interestFeed;
       case 1:
         return appState.feed;
       default:
@@ -118,19 +171,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             Container(
               width: 32,
               height: 32,
-              decoration: BoxDecoration(
-                  gradient: Brand.gradient, borderRadius: BorderRadius.circular(9)),
+              decoration: BoxDecoration(gradient: Brand.gradient, borderRadius: BorderRadius.circular(9)),
               alignment: Alignment.center,
-              child: const Text('V',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+              child: const Text('V', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Container(
                 height: 38,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                    color: p.surfaceAlt, borderRadius: BorderRadius.circular(19)),
+                decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(19)),
                 child: Row(
                   children: [
                     Icon(Icons.search, size: 18, color: p.secondary),
@@ -143,7 +193,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ],
         ),
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none)),
+          IconButton(
+            onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationsScreen())),
+            icon: const Icon(Icons.notifications_none),
+          ),
           const SizedBox(width: 4),
         ],
         bottom: TabBar(
@@ -156,37 +210,88 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         listenable: appState,
         builder: (context, _) {
           final list = _list();
-          return ListView(
-            controller: _scroll,
-            padding: const EdgeInsets.only(top: 10, bottom: 20),
-            children: [
-              if (_tab.index == 0) ...[
-                const CreateBox(),
-                const SizedBox(height: 12),
-                const StatusRow(),
-                const SectionHeader(
-                    icon: Icons.auto_awesome,
-                    title: 'Recommended for you',
-                    subtitle: 'AI picked'),
-              ],
-              ...list.map((post) => PostCard(post: post, onTap: () => openPost(context, post))),
-              if (appState.hasMore)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
-                )
-              else
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: Center(
-                    child: Text('You are all caught up',
-                        style: TextStyle(color: p.secondary, fontSize: 12.5)),
-                  ),
-                ),
-            ],
-          );
+          final children = <Widget>[];
+          if (_tab.index == 0) {
+            children.add(const CreateBox());
+            children.add(const SizedBox(height: 12));
+            children.add(const StatusRow());
+            children.add(_topicsRow(context));
+            children.add(const SectionHeader(icon: Icons.auto_awesome, title: 'Recommended for you', subtitle: '70% matched to your interests'));
+          }
+          for (var i = 0; i < list.length; i++) {
+            children.add(PostCard(
+              post: list[i],
+              onTap: () => openPost(context, list[i]),
+              onTag: (t) => openTopic(context, t),
+              onAuthor: (u) => openUser(context, u),
+            ));
+            if (i > 0 && i % 7 == 0) children.add(const SponsoredCard());
+          }
+          if (appState.hasMore) {
+            children.add(const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
+            ));
+          } else {
+            children.add(Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: Text('You are all caught up', style: TextStyle(color: p.secondary, fontSize: 12.5))),
+            ));
+          }
+          return ListView(controller: _scroll, padding: const EdgeInsets.only(top: 10, bottom: 20), children: children);
         },
       ),
+    );
+  }
+
+  Widget _topicsRow(BuildContext context) {
+    final p = Palette.of(context);
+    final topics = appState.trendingTopics;
+    if (topics.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+          child: Row(
+            children: [
+              Icon(Icons.tag, size: 17, color: Brand.blue),
+              const SizedBox(width: 6),
+              Text('Trending topics', style: TextStyle(color: p.text, fontSize: 16, fontWeight: FontWeight.w800)),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 36,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            itemCount: topics.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, i) {
+              final t = topics[i];
+              return GestureDetector(
+                onTap: () => openTopic(context, t.name),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: p.surface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: p.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Text('#${t.name}', style: TextStyle(color: p.text, fontSize: 13, fontWeight: FontWeight.w700)),
+                      const SizedBox(width: 6),
+                      Text(fmt(t.posts), style: TextStyle(color: p.secondary, fontSize: 11.5)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -206,10 +311,7 @@ class CreateBox extends StatelessWidget {
           children: [
             const Avatar(label: 'A', color: Brand.blue),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text('What is on your mind?',
-                  style: TextStyle(color: p.secondary, fontSize: 15)),
-            ),
+            Expanded(child: Text('What is on your mind?', style: TextStyle(color: p.secondary, fontSize: 15))),
             const Icon(Icons.edit_outlined, size: 20, color: Brand.blue),
           ],
         ),
@@ -232,13 +334,9 @@ class StatusRow extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
           child: Row(
             children: [
-              Text('Status',
-                  style: TextStyle(color: p.text, fontSize: 16, fontWeight: FontWeight.w800)),
+              Text('Status', style: TextStyle(color: p.text, fontSize: 16, fontWeight: FontWeight.w800)),
               const SizedBox(width: 8),
-              Expanded(
-                child: Text('disappears after 24 hours',
-                    style: TextStyle(color: p.secondary, fontSize: 12)),
-              ),
+              Expanded(child: Text('disappears after 24 hours', style: TextStyle(color: p.secondary, fontSize: 12))),
             ],
           ),
         ),
@@ -248,19 +346,14 @@ class StatusRow extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 14),
             children: [
-              StatusRing(
-                label: 'Add status',
-                add: true,
-                onTap: () => pickStatus(context),
-              ),
+              StatusRing(label: 'Add status', add: true, onTap: () => pickStatus(context)),
               ...statuses.map(
                 (s) => Padding(
                   padding: const EdgeInsets.only(left: 10),
                   child: StatusRing(
                     label: s.author,
                     imageBytes: s.imageBytes,
-                    gradient: LinearGradient(
-                        colors: statusGradients[s.gradientIndex % statusGradients.length]),
+                    gradient: LinearGradient(colors: statusGradients[s.gradientIndex % statusGradients.length]),
                     onTap: () => openStatus(context, s),
                   ),
                 ),
@@ -280,6 +373,7 @@ class DiscoverScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = Palette.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Discover')),
       body: ListenableBuilder(
@@ -291,19 +385,131 @@ class DiscoverScreen extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.fromLTRB(14, 4, 14, 6),
                 child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search posts, moods, people...',
-                    prefixIcon: Icon(Icons.search, size: 20),
+                  decoration: InputDecoration(hintText: 'Search posts, moods, people...', prefixIcon: Icon(Icons.search, size: 20)),
+                ),
+              ),
+              const SectionHeader(icon: Icons.tag, title: 'Trending topics'),
+              ...appState.trendingTopics.map(
+                (t) => ListTile(
+                  onTap: () => openTopic(context, t.name),
+                  leading: Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(color: Brand.blue.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.tag, color: Brand.blue, size: 20),
                   ),
+                  title: Text('#${t.name}', style: TextStyle(color: p.text, fontWeight: FontWeight.w700, fontSize: 14.5)),
+                  subtitle: Text('${fmt(t.posts)} posts', style: TextStyle(color: p.secondary, fontSize: 12.5)),
                 ),
               ),
               const SectionHeader(icon: Icons.local_fire_department, title: 'Hot right now'),
-              ...appState.trending
-                  .take(12)
-                  .map((post) => PostCard(post: post, onTap: () => openPost(context, post))),
+              ...appState.trending.take(8).map((post) => PostCard(
+                    post: post,
+                    onTap: () => openPost(context, post),
+                    onTag: (t) => openTopic(context, t),
+                    onAuthor: (u) => openUser(context, u),
+                  )),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+// -------------------------------------------------------------- GROUPS
+
+class GroupsScreen extends StatelessWidget {
+  const GroupsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Groups')),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Brand.blue,
+        onPressed: () => _createDialog(context),
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+      body: ListenableBuilder(
+        listenable: appState,
+        builder: (context, _) {
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 90),
+            children: appState.groups
+                .map((g) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Block(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 46, height: 46,
+                                  decoration: BoxDecoration(gradient: Brand.gradient, borderRadius: BorderRadius.circular(12)),
+                                  child: const Icon(Icons.groups, color: Colors.white),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(g.name, style: TextStyle(color: p.text, fontSize: 15, fontWeight: FontWeight.w800)),
+                                      Text('${fmt(g.members)} members', style: TextStyle(color: p.secondary, fontSize: 12.5)),
+                                    ],
+                                  ),
+                                ),
+                                g.joined
+                                    ? OutlinedButton(
+                                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8)),
+                                        onPressed: () => appState.toggleGroup(g),
+                                        child: const Text('Joined'))
+                                    : FilledButton(
+                                        style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9)),
+                                        onPressed: () => appState.toggleGroup(g),
+                                        child: const Text('Join')),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Text(g.description, style: TextStyle(color: p.secondary, fontSize: 13.5, height: 1.35)),
+                          ],
+                        ),
+                      ),
+                    ))
+                .toList(),
+          );
+        },
+      ),
+    );
+  }
+
+  void _createDialog(BuildContext context) {
+    final name = TextEditingController();
+    final desc = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Create group'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: name, decoration: const InputDecoration(hintText: 'Group name')),
+            const SizedBox(height: 10),
+            TextField(controller: desc, decoration: const InputDecoration(hintText: 'Description')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              if (name.text.trim().isNotEmpty) appState.addGroup(name.text.trim(), desc.text.trim());
+              Navigator.pop(context);
+            },
+            child: const Text('Create'),
+          ),
+        ],
       ),
     );
   }
@@ -332,12 +538,8 @@ class StatusScreen extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: Brand.gradient,
-                        shape: BoxShape.circle,
-                      ),
+                      width: 44, height: 44,
+                      decoration: const BoxDecoration(gradient: Brand.gradient, shape: BoxShape.circle),
                       child: const Icon(Icons.add, color: Colors.white),
                     ),
                     const SizedBox(width: 14),
@@ -345,12 +547,9 @@ class StatusScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Add a photo status',
-                              style: TextStyle(
-                                  color: p.text, fontSize: 15, fontWeight: FontWeight.w800)),
+                          Text('Add a photo status', style: TextStyle(color: p.text, fontSize: 15, fontWeight: FontWeight.w800)),
                           const SizedBox(height: 2),
-                          Text('It stays for 24 hours, then deletes itself',
-                              style: TextStyle(color: p.secondary, fontSize: 12.5)),
+                          Text('It stays for 24 hours, then deletes itself', style: TextStyle(color: p.secondary, fontSize: 12.5)),
                         ],
                       ),
                     ),
@@ -358,8 +557,7 @@ class StatusScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Text('Recent statuses',
-                  style: TextStyle(color: p.text, fontSize: 16, fontWeight: FontWeight.w800)),
+              Text('Recent statuses', style: TextStyle(color: p.text, fontSize: 16, fontWeight: FontWeight.w800)),
               const SizedBox(height: 10),
               if (statuses.isEmpty)
                 const Padding(
@@ -377,15 +575,12 @@ class StatusScreen extends StatelessWidget {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: SizedBox(
-                            width: 60,
-                            height: 60,
+                            width: 60, height: 60,
                             child: s.imageBytes != null
                                 ? Image.memory(s.imageBytes!, fit: BoxFit.cover)
                                 : Container(
                                     decoration: BoxDecoration(
-                                      gradient: LinearGradient(colors: statusGradients[
-                                          s.gradientIndex % statusGradients.length]),
-                                    ),
+                                        gradient: LinearGradient(colors: statusGradients[s.gradientIndex % statusGradients.length])),
                                   ),
                           ),
                         ),
@@ -394,9 +589,7 @@ class StatusScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(s.author,
-                                  style: TextStyle(
-                                      color: p.text, fontSize: 14.5, fontWeight: FontWeight.w800)),
+                              Text(s.author, style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w800)),
                               const SizedBox(height: 3),
                               Text('Expires in ${s.remaining.inHours}h ${s.remaining.inMinutes % 60}m',
                                   style: TextStyle(color: Brand.blue, fontSize: 12.5)),
@@ -433,39 +626,32 @@ class NotificationsScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
             children: appState.notifications
-                .map(
-                  (n) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Block(
-                      padding: const EdgeInsets.all(14),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                                gradient: Brand.gradient,
-                                borderRadius: BorderRadius.circular(12)),
-                            child: Icon(n.icon, size: 20, color: Colors.white),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(n.text,
-                                    style: TextStyle(color: p.text, fontSize: 14, height: 1.3)),
-                                const SizedBox(height: 3),
-                                Text(n.time,
-                                    style: TextStyle(color: Brand.blue, fontSize: 12)),
-                              ],
+                .map((n) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Block(
+                        padding: const EdgeInsets.all(14),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42, height: 42,
+                              decoration: BoxDecoration(gradient: Brand.gradient, borderRadius: BorderRadius.circular(12)),
+                              child: Icon(n.icon, size: 20, color: Colors.white),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(n.text, style: TextStyle(color: p.text, fontSize: 14, height: 1.3)),
+                                  const SizedBox(height: 3),
+                                  Text(n.time, style: TextStyle(color: Brand.blue, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
-                )
+                    ))
                 .toList(),
           );
         },
@@ -486,7 +672,8 @@ class ComposeScreen extends StatefulWidget {
 class _ComposeScreenState extends State<ComposeScreen> {
   final _controller = TextEditingController();
   String _mood = moodList.first;
-  late bool _anonymous = appState.anonymousByDefault;
+  late bool _anonymous = appState.publicByDefault ? false : true;
+  PostVisibility _visibility = PostVisibility.public;
 
   @override
   void dispose() {
@@ -494,10 +681,13 @@ class _ComposeScreenState extends State<ComposeScreen> {
     super.dispose();
   }
 
+  List<String> _tags(String text) =>
+      text.split(RegExp(r'\s+')).where((w) => w.startsWith('#') && w.length > 1).toList();
+
   void _submit() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    appState.addPost(text, _mood, _anonymous);
+    appState.addPost(text, _mood, _anonymous, _visibility, _tags(text));
     _controller.clear();
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Posted')));
@@ -513,8 +703,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: FilledButton(
-              style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10)),
+              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10)),
               onPressed: _controller.text.trim().isEmpty ? null : _submit,
               child: const Text('Post'),
             ),
@@ -526,11 +715,10 @@ class _ComposeScreenState extends State<ComposeScreen> {
         children: [
           Row(
             children: [
-              Avatar(
-                  label: _anonymous ? 'A' : appState.username[0],
-                  color: _anonymous ? p.secondary : Brand.blue),
+              Avatar(label: _anonymous ? 'A' : appState.me.name[0],
+                  color: _anonymous ? p.secondary : Brand.blue, verified: !_anonymous),
               const SizedBox(width: 10),
-              Text(_anonymous ? 'Anjaan' : appState.username,
+              Text(_anonymous ? 'Anjaan' : appState.me.name,
                   style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 15)),
             ],
           ),
@@ -538,12 +726,12 @@ class _ComposeScreenState extends State<ComposeScreen> {
           TextField(
             controller: _controller,
             onChanged: (_) => setState(() {}),
-            maxLines: 8,
+            maxLines: 7,
             maxLength: 300,
             autofocus: true,
             style: TextStyle(color: p.text, fontSize: 18, height: 1.45),
             decoration: const InputDecoration(
-              hintText: 'What is on your mind?',
+              hintText: 'What is on your mind?  Use #tags to join a topic',
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
@@ -554,8 +742,28 @@ class _ComposeScreenState extends State<ComposeScreen> {
           const SizedBox(height: 6),
           Divider(color: p.divider),
           const SizedBox(height: 14),
-          Text('Add a mood',
-              style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w800)),
+          Text('Who can see this', style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: PostVisibility.values.map((v) {
+              final selected = v == _visibility;
+              final label = v == PostVisibility.public ? 'Public' : v == PostVisibility.followers ? 'Followers' : 'Private';
+              return ChoiceChip(
+                avatar: Icon(visibilityIcon(v), size: 15, color: selected ? Colors.white : p.secondary),
+                label: Text(label),
+                selected: selected,
+                onSelected: (_) => setState(() => _visibility = v),
+                showCheckmark: false,
+                selectedColor: Brand.blue,
+                labelStyle: TextStyle(color: selected ? Colors.white : p.text, fontWeight: FontWeight.w700, fontSize: 12.5),
+                backgroundColor: p.surface,
+                side: BorderSide(color: p.border),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+          Text('Add a mood', style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
@@ -568,10 +776,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                 selected: selected,
                 onSelected: (_) => setState(() => _mood = m),
                 selectedColor: c.withValues(alpha: 0.16),
-                labelStyle: TextStyle(
-                    color: selected ? c : p.secondary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12.5),
+                labelStyle: TextStyle(color: selected ? c : p.secondary, fontWeight: FontWeight.w700, fontSize: 12.5),
                 side: BorderSide(color: selected ? c : p.border),
                 backgroundColor: p.surface,
                 showCheckmark: false,
@@ -584,14 +789,12 @@ class _ComposeScreenState extends State<ComposeScreen> {
             child: SwitchListTile(
               value: _anonymous,
               onChanged: (v) => setState(() => _anonymous = v),
-              title: Text('Post anonymously',
-                  style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w700)),
-              subtitle: Text('Your name will not be shown',
-                  style: TextStyle(color: p.secondary, fontSize: 12.5)),
+              title: Text('Post anonymously', style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w700)),
+              subtitle: Text('Your name will not be shown', style: TextStyle(color: p.secondary, fontSize: 12.5)),
             ),
           ),
           const SizedBox(height: 8),
-          Text('Posts are text only. Use Status for photos.',
+          Text('Posts are text only. Use Status for photos. Posts auto-delete after 1 month.',
               style: TextStyle(color: p.secondary, fontSize: 12)),
         ],
       ),
@@ -637,7 +840,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final p = Palette.of(context);
     final post = widget.post;
     return Scaffold(
-      appBar: AppBar(title: const Text('Post')),
+      appBar: AppBar(
+        title: const Text('Post'),
+        actions: [
+          IconButton(onPressed: () => shareSheet(context, post), icon: const Icon(Icons.share_outlined)),
+          const SizedBox(width: 4),
+        ],
+      ),
       body: ListenableBuilder(
         listenable: appState,
         builder: (context, _) {
@@ -647,23 +856,24 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 child: ListView(
                   padding: const EdgeInsets.only(top: 10),
                   children: [
-                    PostCard(post: post, onTap: () {}),
+                    PostCard(
+                      post: post,
+                      onTap: () {},
+                      onTag: (t) => openTopic(context, t),
+                      onAuthor: (u) => openUser(context, u),
+                    ),
                     const SectionHeader(title: 'Comments'),
                     if (post.comments.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 24),
-                        child: EmptyState(
-                            icon: Icons.chat_bubble_outline, message: 'No comments yet.'),
+                        child: EmptyState(icon: Icons.chat_bubble_outline, message: 'No comments yet.'),
                       ),
                     ...post.comments.map(
                       (c) => Padding(
                         padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
                         child: CommentTile(
                           comment: c,
-                          onReply: () {
-                            setState(() => _replyTo = c);
-                            FocusScope.of(context).requestFocus(FocusNode());
-                          },
+                          onReply: () => setState(() => _replyTo = c),
                           onLike: () => appState.toggleCommentLike(c),
                         ),
                       ),
@@ -676,22 +886,17 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 top: false,
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                  decoration: BoxDecoration(
-                    color: p.surface,
-                    border: Border(top: BorderSide(color: p.divider)),
-                  ),
+                  decoration: BoxDecoration(color: p.surface, border: Border(top: BorderSide(color: p.divider))),
                   child: Column(
                     children: [
                       if (_replyTo != null)
                         Row(
                           children: [
-                            Text('Replying to ${_replyTo!.author}',
-                                style: TextStyle(color: Brand.blue, fontSize: 12)),
+                            Text('Replying to ${_replyTo!.author}', style: TextStyle(color: Brand.blue, fontSize: 12)),
                             const Spacer(),
                             GestureDetector(
                               onTap: () => setState(() => _replyTo = null),
-                              child: Text('Cancel',
-                                  style: TextStyle(color: p.secondary, fontSize: 12)),
+                              child: Text('Cancel', style: TextStyle(color: p.secondary, fontSize: 12)),
                             ),
                           ],
                         ),
@@ -702,20 +907,127 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           Expanded(
                             child: TextField(
                               controller: _controller,
-                              decoration: InputDecoration(
-                                  hintText:
-                                      _replyTo == null ? 'Write a comment...' : 'Write a reply...'),
+                              decoration: InputDecoration(hintText: _replyTo == null ? 'Write a comment...' : 'Write a reply...'),
                             ),
                           ),
                           const SizedBox(width: 8),
-                          IconButton.filled(
-                              onPressed: _send, icon: const Icon(Icons.send_rounded, size: 18)),
+                          IconButton.filled(onPressed: _send, icon: const Icon(Icons.send_rounded, size: 18)),
                         ],
                       ),
                     ],
                   ),
                 ),
               ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// -------------------------------------------------------------- TOPIC
+
+class TopicScreen extends StatelessWidget {
+  final String tag;
+  const TopicScreen({super.key, required this.tag});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('#$tag')),
+      body: ListenableBuilder(
+        listenable: appState,
+        builder: (context, _) {
+          final list = appState.postsWithTag(tag);
+          if (list.isEmpty) {
+            return const EmptyState(icon: Icons.tag, message: 'No posts in this topic yet.');
+          }
+          return ListView(
+            padding: const EdgeInsets.only(top: 10, bottom: 20),
+            children: list.map((post) => PostCard(
+                  post: post,
+                  onTap: () => openPost(context, post),
+                  onTag: (t) => openTopic(context, t),
+                  onAuthor: (u) => openUser(context, u),
+                )).toList(),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ------------------------------------------------------- USER PROFILE
+
+class UserProfileScreen extends StatelessWidget {
+  final User user;
+  const UserProfileScreen({super.key, required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(user.name)),
+      body: ListenableBuilder(
+        listenable: appState,
+        builder: (context, _) {
+          final theirPosts = appState.posts.where((x) => !x.anonymous && x.author == user.name).toList();
+          return ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              Container(height: 110, decoration: const BoxDecoration(gradient: Brand.cover)),
+              Transform.translate(
+                offset: const Offset(0, -44),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(shape: BoxShape.circle, color: p.bg),
+                            child: Avatar(label: user.name, size: 88, color: avatarColors[user.colorIndex], verified: user.verified),
+                          ),
+                          const Spacer(),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: FollowButton(user: user),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Text(user.name, style: TextStyle(color: p.text, fontSize: 20, fontWeight: FontWeight.w800)),
+                          if (user.verified) ...[const SizedBox(width: 5), const VerifiedBadge(size: 17)],
+                        ],
+                      ),
+                      Text(user.handle, style: TextStyle(color: p.secondary, fontSize: 14)),
+                      const SizedBox(height: 8),
+                      if (user.bio.isNotEmpty) Text(user.bio, style: TextStyle(color: p.text, fontSize: 14, height: 1.4)),
+                      const SizedBox(height: 8),
+                      Text('${fmt(user.following)} following  ·  ${fmt(user.followers)} followers',
+                          style: TextStyle(color: p.secondary, fontSize: 13)),
+                      const SizedBox(height: 14),
+                    ],
+                  ),
+                ),
+              ),
+              Divider(height: 1, color: p.divider),
+              if (theirPosts.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: EmptyState(icon: Icons.article_outlined, message: 'No public posts yet.'),
+                ),
+              ...theirPosts.map((post) => PostCard(
+                    post: post,
+                    onTap: () => openPost(context, post),
+                    onTag: (t) => openTopic(context, t),
+                  )),
             ],
           );
         },
@@ -738,7 +1050,8 @@ class ProfileScreen extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Me'),
           actions: [
-            IconButton(onPressed: () {}, icon: const Icon(Icons.settings_outlined)),
+            IconButton(onPressed: () => _open(context, const AdminPanelScreen()), icon: const Icon(Icons.insights_outlined)),
+            IconButton(onPressed: () => _open(context, const SettingsScreen()), icon: const Icon(Icons.settings_outlined)),
             const SizedBox(width: 4),
           ],
         ),
@@ -753,63 +1066,42 @@ class ProfileScreen extends StatelessWidget {
                     listenable: appState,
                     builder: (context, _) {
                       final mine = appState.myPosts;
-                      if (mine.isEmpty) {
-                        return const EmptyState(
-                            icon: Icons.edit_note, message: 'No posts yet.');
-                      }
+                      if (mine.isEmpty) return const EmptyState(icon: Icons.edit_note, message: 'No posts yet.');
                       return ListView(
                         padding: const EdgeInsets.only(top: 10, bottom: 20),
-                        children: mine
-                            .map((post) =>
-                                PostCard(post: post, onTap: () => openPost(context, post)))
-                            .toList(),
+                        children: mine.map((post) => PostCard(
+                              post: post,
+                              onTap: () => openPost(context, post),
+                              onTag: (t) => openTopic(context, t),
+                            )).toList(),
                       );
                     },
                   ),
                   ListenableBuilder(
                     listenable: appState,
                     builder: (context, _) {
-                      final mine = appState.activeStatuses
-                          .where((s) => s.author == appState.username)
-                          .toList();
+                      final mine = appState.activeStatuses.where((s) => s.author == appState.me.name).toList();
                       if (mine.isEmpty) {
-                        return const EmptyState(
-                            icon: Icons.auto_stories_outlined,
-                            message: 'No status yet. Add one from the Status tab.');
+                        return const EmptyState(icon: Icons.auto_stories_outlined, message: 'No status yet. Add one from the Status tab.');
                       }
                       return ListView(
                         padding: const EdgeInsets.all(14),
-                        children: mine
-                            .map((s) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: Block(
-                                    onTap: () => openStatus(context, s),
-                                    padding: const EdgeInsets.all(12),
-                                    child: Text(
-                                        'Status · expires in ${s.remaining.inHours}h',
-                                        style: TextStyle(color: p.text, fontSize: 14)),
-                                  ),
-                                ))
-                            .toList(),
+                        children: mine.map((s) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Block(
+                                onTap: () => openStatus(context, s),
+                                padding: const EdgeInsets.all(12),
+                                child: Text('Status · expires in ${s.remaining.inHours}h', style: TextStyle(color: p.text, fontSize: 14)),
+                              ),
+                            )).toList(),
                       );
                     },
                   ),
                   ListView(
                     children: [
-                      ListTile(
-                        leading: Icon(Icons.info_outline, color: p.secondary),
-                        title: Text(appState.bio, style: TextStyle(color: p.text, fontSize: 14)),
-                      ),
-                      ListTile(
-                        leading: Icon(Icons.calendar_today_outlined, color: p.secondary),
-                        title: Text('Joined October 2026',
-                            style: TextStyle(color: p.text, fontSize: 14)),
-                      ),
-                      ListTile(
-                        leading: Icon(Icons.local_fire_department_outlined, color: p.secondary),
-                        title: Text('${appState.streak}-day streak',
-                            style: TextStyle(color: p.text, fontSize: 14)),
-                      ),
+                      ListTile(leading: Icon(Icons.info_outline, color: p.secondary), title: Text(appState.me.bio, style: TextStyle(color: p.text, fontSize: 14))),
+                      ListTile(leading: Icon(Icons.alternate_email, color: p.secondary), title: Text(appState.me.handle, style: TextStyle(color: p.text, fontSize: 14))),
+                      ListTile(leading: Icon(Icons.local_fire_department_outlined, color: p.secondary), title: Text('${appState.streak}-day streak', style: TextStyle(color: p.text, fontSize: 14))),
                     ],
                   ),
                 ],
@@ -821,6 +1113,10 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  void _open(BuildContext context, Widget w) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => w));
+  }
+
   Widget _header(BuildContext context, Palette p) {
     return Column(
       children: [
@@ -830,14 +1126,12 @@ class ProfileScreen extends StatelessWidget {
             children: [
               Container(height: 140, decoration: const BoxDecoration(gradient: Brand.cover)),
               Positioned(
-                left: 0,
-                right: 0,
-                top: 86,
+                left: 0, right: 0, top: 86,
                 child: Center(
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(shape: BoxShape.circle, color: p.bg),
-                    child: const Avatar(label: 'A', size: 96),
+                    child: const Avatar(label: 'A', size: 96, verified: false),
                   ),
                 ),
               ),
@@ -845,10 +1139,14 @@ class ProfileScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Text(appState.username,
-            style: TextStyle(color: p.text, fontSize: 22, fontWeight: FontWeight.w800)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(appState.me.name, style: TextStyle(color: p.text, fontSize: 22, fontWeight: FontWeight.w800)),
+          ],
+        ),
         const SizedBox(height: 2),
-        Text('${appState.following} following  ·  ${appState.friends} followers',
+        Text('${fmt(appState.me.following)} following  ·  ${fmt(appState.me.followers)} followers',
             style: TextStyle(color: p.secondary, fontSize: 13)),
         const SizedBox(height: 12),
         Padding(
@@ -864,13 +1162,273 @@ class ProfileScreen extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: OutlinedButton(onPressed: () {}, child: const Text('Edit profile')),
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdminPanelScreen())),
+                  child: const Text('Admin panel'),
+                ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
       ],
+    );
+  }
+}
+
+// --------------------------------------------------------- ADMIN PANEL
+
+class AdminPanelScreen extends StatelessWidget {
+  const AdminPanelScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Admin panel')),
+      body: ListenableBuilder(
+        listenable: appState,
+        builder: (context, _) {
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+            children: [
+              Text('Analytics', style: TextStyle(color: p.text, fontSize: 17, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _stat(context, Icons.visibility_outlined, fmt(appState.totalViews), 'Views'),
+                  const SizedBox(width: 10),
+                  _stat(context, Icons.favorite_border, fmt(appState.totalLikes), 'Likes'),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _stat(context, Icons.mode_comment_outlined, fmt(appState.totalComments), 'Comments'),
+                  const SizedBox(width: 10),
+                  _stat(context, Icons.people_alt_outlined, fmt(appState.me.followers), 'Followers'),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Text('Views this week', style: TextStyle(color: p.text, fontSize: 15, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 10),
+              _chart(context, appState.viewsByDay),
+              const SizedBox(height: 20),
+              Text('Manage', style: TextStyle(color: p.text, fontSize: 17, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 10),
+              _action(context, Icons.edit_outlined, 'Create a post', () => openCompose(context)),
+              _action(context, Icons.link, 'Links', () => _linksDialog(context)),
+              _action(context, Icons.info_outline, 'About us', () => _aboutDialog(context)),
+              _action(context, Icons.groups_outlined, 'Groups', () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GroupsScreen()))),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _stat(BuildContext context, IconData icon, String value, String label) {
+    final p = Palette.of(context);
+    return Expanded(
+      child: Block(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 20, color: Brand.blue),
+            const SizedBox(height: 8),
+            Text(value, style: TextStyle(color: p.text, fontSize: 20, fontWeight: FontWeight.w800)),
+            Text(label, style: TextStyle(color: p.secondary, fontSize: 12.5)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _chart(BuildContext context, List<int> data) {
+    final p = Palette.of(context);
+    final maxV = data.reduce((a, b) => a > b ? a : b);
+    return Block(
+      padding: const EdgeInsets.all(16),
+      child: SizedBox(
+        height: 120,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: data
+              .map((v) => Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Container(
+                            height: (v / maxV) * 90 + 6,
+                            decoration: BoxDecoration(
+                              gradient: Brand.gradient,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text('$v', style: TextStyle(color: p.secondary, fontSize: 9.5)),
+                        ],
+                      ),
+                    ),
+                  ))
+              .toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _action(BuildContext context, IconData icon, String label, VoidCallback onTap) {
+    final p = Palette.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Block(
+        onTap: onTap,
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Icon(icon, color: Brand.blue, size: 20),
+            const SizedBox(width: 12),
+            Expanded(child: Text(label, style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w600))),
+            Icon(Icons.chevron_right, color: p.secondary),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _linksDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Links'),
+        content: const Text('Add links to your profile - website, socials, contact.\n\n(Stored once the backend is connected.)'),
+        actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+      ),
+    );
+  }
+
+  void _aboutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('About us'),
+        content: const Text('Vent is a safe, anonymous place to say how you feel.\n\nBe kind. Report abuse. Posts auto-delete after 1 month.'),
+        actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+      ),
+    );
+  }
+}
+
+// ----------------------------------------------------------- SETTINGS
+
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Settings')),
+      body: ListenableBuilder(
+        listenable: appState,
+        builder: (context, _) {
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+            children: [
+              Text('Account', style: TextStyle(color: p.text, fontSize: 15, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Block(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    const Avatar(label: 'A', size: 44, color: Brand.blue),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(appState.me.name, style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14.5)),
+                          Text(appState.me.handle, style: TextStyle(color: p.secondary, fontSize: 12.5)),
+                        ],
+                      ),
+                    ),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8)),
+                      onPressed: () {
+                        appState.me.handle = appState.suggestUsername(appState.me.name);
+                        setState(() {});
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('New username: ${appState.me.handle}')),
+                        );
+                      },
+                      child: const Text('New username'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text('Notifications', style: TextStyle(color: p.text, fontSize: 15, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Block(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      value: appState.notifyReplies,
+                      onChanged: (v) => setState(() => appState.notifyReplies = v),
+                      title: Text('Replies and comments', style: TextStyle(color: p.text, fontSize: 14)),
+                    ),
+                    SwitchListTile(
+                      value: appState.notifyLikes,
+                      onChanged: (v) => setState(() => appState.notifyLikes = v),
+                      title: Text('Likes and follows', style: TextStyle(color: p.text, fontSize: 14)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text('Privacy', style: TextStyle(color: p.text, fontSize: 15, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Block(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      value: appState.publicByDefault,
+                      onChanged: (v) => setState(() => appState.publicByDefault = v),
+                      title: Text('New posts are public by default', style: TextStyle(color: p.text, fontSize: 14)),
+                    ),
+                    SwitchListTile(
+                      value: appState.showAds,
+                      onChanged: (v) => setState(() => appState.showAds = v),
+                      title: Text('Show sponsored posts', style: TextStyle(color: p.text, fontSize: 14)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Block(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Icon(Icons.timer_outlined, color: Brand.blue),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text('Every post auto-deletes 1 month after it is created.', style: TextStyle(color: p.secondary, fontSize: 13))),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

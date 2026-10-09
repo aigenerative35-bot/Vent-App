@@ -2,28 +2,28 @@
 
 Vent is a Flutter social app where people share short, anonymous text posts about
 how they feel, and others can view, comment (with replies), **Lift** (repost) and
-like them.
-
-The UI is a Weibo-style layout in blue: a top bar with search, tabs
-(For You / Latest / Hot), an AI "Recommended for you" feed, posts with view /
-comment / lift / like counts, an infinite feed that loads more as you scroll, and
-a 24-hour photo **Status**. Light and dark themes are both supported. All UI text
-is in English.
+like them. Weibo-style layout in blue, English UI, light + dark themes.
 
 This version runs on **local demo data** (no backend yet). Firebase (Auth +
-Firestore) will replace the in-memory store; the UI only talks to `AppState`, so
-the swap stays contained.
+Firestore) will replace the in-memory store; the UI only talks to `AppState`.
 
-## What works now
+## Features
 
-- Home: create box, Status row, AI "Recommended for you" + Latest + Hot tabs
-- Infinite scroll: the feed loads more posts as you scroll (pagination)
-- Posts show **views**, **comments**, **Lifts** (reposts) and **likes**
-- Comments support **replies** (nested) and comment likes
-- **Status**: add a photo status that disappears after 24 hours
-- Discover: search + hot posts
-- Notifications, and a cover-photo profile (Posts / Status / About)
-- Follows the system light / dark setting
+- **Feed**: tabs For You / Latest / Hot; AI "Recommended for you" (~70% matched
+  to the moods you engage with); infinite scroll (loads more as you scroll)
+- **Counts** on every post: views, comments, Lifts (reposts), likes
+- **Comments with replies** (nested) and comment likes
+- **Follow** button on every user profile; tap an avatar to open their profile
+- **Verified** badges
+- **Hashtags** (#tags) are tappable and open a topic feed; **Trending topics**
+- **Post visibility**: public / followers only / private
+- **Auto-delete**: every post deletes itself 1 month after it is created
+- **Groups**: create and join groups; share a post to your followers or a group
+- **Admin panel**: analytics (views, likes, comments, followers, weekly chart),
+  quick post, links, about us
+- **Settings**: notification toggles, privacy, username generator, sponsored toggle
+- **Status**: a 24-hour photo status that deletes itself
+- **Sponsored** slot in the feed (native-ad style)
 
 ## Run
 
@@ -38,8 +38,8 @@ Build an APK:
 
 - `lib/main.dart` - app entry, bottom-nav shell
 - `lib/theme.dart` - brand blue, palettes, theme, Block
-- `lib/models.dart` - models + in-memory AppState (demo data, pagination, statuses)
-- `lib/widgets.dart` - Avatar, PostCard, CommentTile, StatusRing, etc.
+- `lib/models.dart` - models + in-memory AppState
+- `lib/widgets.dart` - Avatar, PostCard, CommentTile, StatusRing, SponsoredCard, etc.
 - `lib/screens.dart` - all screens
 - `.github/workflows/flutter.yml` - CI that builds the APK
 
@@ -47,4 +47,4 @@ Build an APK:
 
 - The app name is a working name and can change.
 - Posts are text only; photos live in the 24-hour Status.
-- Android + web platforms are enabled (one codebase, later a website).
+- Real AdMob ads and multi-user data need the Firebase / AdMob setup (next step).

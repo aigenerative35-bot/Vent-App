@@ -1,6 +1,40 @@
 import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+
+enum PostVisibility { public, followers, private }
+
+const List<Color> avatarColors = [
+  Color(0xFF1E7BFF),
+  Color(0xFF7C5CFF),
+  Color(0xFF22C55E),
+  Color(0xFFF59E0B),
+  Color(0xFFF43F8E),
+  Color(0xFF22D3EE),
+];
+
+class User {
+  final String id;
+  final String name;
+  String handle;
+  bool verified;
+  final int colorIndex;
+  String bio;
+  int followers;
+  int following;
+  final bool isMe;
+
+  User({
+    required this.id,
+    required this.name,
+    required this.handle,
+    this.verified = false,
+    this.colorIndex = 0,
+    this.bio = '',
+    this.followers = 0,
+    this.following = 0,
+    this.isMe = false,
+  });
+}
 
 class Comment {
   final String author;
@@ -9,7 +43,6 @@ class Comment {
   int likes;
   bool liked;
   final List<Comment> replies;
-
   Comment({
     required this.author,
     required this.text,
@@ -20,13 +53,6 @@ class Comment {
   }) : replies = replies ?? [];
 }
 
-class Person {
-  final String name;
-  final String mutual;
-  bool friend;
-  Person({required this.name, required this.mutual, this.friend = false});
-}
-
 class Post {
   final String id;
   final String author;
@@ -34,10 +60,13 @@ class Post {
   final String mood;
   final String text;
   final String time;
+  final DateTime createdAt;
+  final PostVisibility visibility;
+  final List<String> tags;
   int views;
   int likes;
   bool liked;
-  int lifts; // reposts
+  int lifts;
   bool lifted;
   final List<Comment> comments;
 
@@ -48,6 +77,9 @@ class Post {
     required this.mood,
     required this.text,
     required this.time,
+    required this.createdAt,
+    this.visibility = PostVisibility.public,
+    this.tags = const [],
     this.views = 0,
     this.likes = 0,
     this.liked = false,
@@ -58,9 +90,25 @@ class Post {
 
   String get name => anonymous ? 'Anjaan' : author;
   String get handle => anonymous ? '@anjaan' : '@${author.toLowerCase()}';
+  bool get expired => DateTime.now().difference(createdAt).inDays >= 30;
+  int get daysLeft => 30 - DateTime.now().difference(createdAt).inDays;
 }
 
-/// A photo status that disappears 24 hours after it is posted.
+class Group {
+  final String id;
+  final String name;
+  final String description;
+  int members;
+  bool joined;
+  Group({required this.id, required this.name, required this.description, this.members = 0, this.joined = false});
+}
+
+class Topic {
+  final String name;
+  final int posts;
+  Topic({required this.name, required this.posts});
+}
+
 class Status {
   final String id;
   final String author;
@@ -68,7 +116,6 @@ class Status {
   final int gradientIndex;
   final String caption;
   final DateTime createdAt;
-
   Status({
     required this.id,
     required this.author,
@@ -77,7 +124,6 @@ class Status {
     required this.caption,
     required this.createdAt,
   });
-
   DateTime get expiresAt => createdAt.add(const Duration(hours: 24));
   bool get expired => DateTime.now().isAfter(expiresAt);
   Duration get remaining => expiresAt.difference(DateTime.now());
@@ -110,20 +156,20 @@ const List<List<Color>> statusGradients = [
 ];
 
 const List<List<String>> _templates = [
-  ['Stressed', 'My boss shouted at me in front of everyone again today. I came home and just stayed quiet. Who do I even tell?'],
-  ['Angry', 'Three years of hard work, and someone else got the promotion. I am furious and nobody sees it.'],
-  ['Happy', 'Today I did something just for myself for the first time. It is small, but it made me happy.'],
-  ['Lonely', 'It is 2am and I cannot sleep. It feels really lonely in here.'],
-  ['Grateful', 'Tasted my mom\'s cooking again and it hit me - some things never change, and that is a good thing.'],
-  ['Sad', 'Results are out and they are below what I hoped. I do not want to tell anyone at home.'],
-  ['Stressed', 'Deadlines are piling up and I keep telling everyone I am fine. I am not fine.'],
-  ['Angry', 'Someone took credit for my idea in the meeting today. I just sat there smiling.'],
-  ['Lonely', 'Everyone looks so busy with their lives. I feel like I am watching from outside.'],
-  ['Happy', 'Small win today: I finally finished the thing I kept postponing for weeks.'],
-  ['Grateful', 'A stranger helped me when I was lost. Restored a little faith today.'],
-  ['Sad', 'I miss the person I used to be before all this.'],
-  ['Stressed', 'Cannot stop overthinking every message I send. Anyone else?'],
-  ['Angry', 'Why is it so hard to just be heard once without being judged?'],
+  ['Stressed', 'My boss shouted at me in front of everyone again today. I came home and just stayed quiet. Who do I even tell?', '#work #stress'],
+  ['Angry', 'Three years of hard work, and someone else got the promotion. I am furious and nobody sees it.', '#career #angry'],
+  ['Happy', 'Today I did something just for myself for the first time. It is small, but it made me happy.', '#selfcare #happy'],
+  ['Lonely', 'It is 2am and I cannot sleep. It feels really lonely in here.', '#lonely #night'],
+  ['Grateful', 'Tasted my mom\'s cooking again and it hit me - some things never change, and that is a good thing.', '#family #grateful'],
+  ['Sad', 'Results are out and they are below what I hoped. I do not want to tell anyone at home.', '#results #sad'],
+  ['Stressed', 'Deadlines are piling up and I keep telling everyone I am fine. I am not fine.', '#work #burnout'],
+  ['Angry', 'Someone took credit for my idea in the meeting today. I just sat there smiling.', '#office #angry'],
+  ['Lonely', 'Everyone looks so busy with their lives. I feel like I am watching from outside.', '#lonely'],
+  ['Happy', 'Small win today: I finally finished the thing I kept postponing for weeks.', '#wins #happy'],
+  ['Grateful', 'A stranger helped me when I was lost. Restored a little faith today.', '#kindness'],
+  ['Sad', 'I miss the person I used to be before all this.', '#sad #life'],
+  ['Stressed', 'Cannot stop overthinking every message I send. Anyone else?', '#anxiety #stress'],
+  ['Angry', 'Why is it so hard to just be heard once without being judged?', '#voice'],
 ];
 
 /// In-memory demo store. Firebase (Auth + Firestore) will replace this later.
@@ -131,25 +177,48 @@ class AppState extends ChangeNotifier {
   final List<Post> posts = [];
   final List<AppNotification> notifications = [];
   final List<Post> myPosts = [];
-  final List<Person> people = [];
   final List<Status> statuses = [];
+  final List<Group> groups = [];
+  final List<User> users = [];
+  final Set<String> followingIds = {};
+  final Map<String, int> interests = {};
+
+  // settings
+  bool notifyReplies = true;
+  bool notifyLikes = true;
+  bool publicByDefault = true;
+  bool showAds = true;
 
   int _visible = 8;
-
   int streak = 5;
-  int friends = 842;
-  int following = 316;
-  final List<String> badges = ['First post', '7-day streak', 'Helpful'];
-  String username = 'Anjaan';
-  String handle = '@anjaan';
-  String bio = 'Writing what is on my mind. Staying anonymous.';
-  bool anonymousByDefault = true;
+
+  late User me;
 
   AppState() {
     _seed();
   }
 
   void _seed() {
+    me = User(
+      id: 'me',
+      name: 'Anjaan',
+      handle: '@anjaan',
+      bio: 'Writing what is on my mind. Staying anonymous.',
+      followers: 1284,
+      following: 316,
+      colorIndex: 0,
+      isMe: true,
+    );
+    users.addAll([
+      me,
+      User(id: 'u1', name: 'Riya', handle: '@riya', verified: true, colorIndex: 1, bio: 'Designer. Tea person.', followers: 8200, following: 210),
+      User(id: 'u2', name: 'Arjun', handle: '@arjun', colorIndex: 2, bio: 'Runner. Reader.', followers: 540, following: 180),
+      User(id: 'u3', name: 'Neha', handle: '@neha', verified: true, colorIndex: 3, bio: 'Writer.', followers: 12400, following: 90),
+      User(id: 'u4', name: 'Kabir', handle: '@kabir', colorIndex: 4, bio: 'Just here.', followers: 210, following: 320),
+      User(id: 'u5', name: 'Priya', handle: '@priya', colorIndex: 5, bio: 'Music and moods.', followers: 3300, following: 410),
+    ]);
+    followingIds.addAll(['u1', 'u3']);
+
     for (var i = 0; i < 26; i++) {
       final t = _templates[i % _templates.length];
       final anon = i % 3 != 1;
@@ -161,6 +230,8 @@ class AppState extends ChangeNotifier {
           mood: t[0],
           text: t[1],
           time: '${(i + 1) * 7}m',
+          createdAt: DateTime.now().subtract(Duration(hours: (i + 1) * 7)),
+          tags: t[2].split(' '),
           views: 800 + i * 137,
           likes: 20 + (i * 53) % 900,
           lifts: 3 + (i * 11) % 180,
@@ -170,9 +241,7 @@ class AppState extends ChangeNotifier {
               text: 'You are not alone in this.',
               time: '${(i + 1) * 3}m',
               likes: 4 + i,
-              replies: [
-                Comment(author: 'Riya', text: 'Exactly. We are here.', time: '2m', likes: 2),
-              ],
+              replies: [Comment(author: 'Riya', text: 'Exactly. We are here.', time: '2m', likes: 2)],
             ),
             Comment(author: 'Kabir', text: 'Same boat. Stay strong.', time: '1m', likes: 3),
           ],
@@ -181,52 +250,61 @@ class AppState extends ChangeNotifier {
     }
 
     notifications.addAll([
+      AppNotification(text: 'Riya followed you.', time: '6m', icon: Icons.person_add_alt),
       AppNotification(text: 'Someone lifted your post.', time: '8m', icon: Icons.repeat),
       AppNotification(text: 'Someone liked your post.', time: '10m', icon: Icons.favorite),
       AppNotification(text: 'New comment: "I am in the same boat."', time: '35m', icon: Icons.mode_comment_outlined),
-      AppNotification(text: 'Today\'s prompt: How are you feeling right now?', time: '3h', icon: Icons.auto_awesome),
       AppNotification(text: 'You hit a 7-day streak. Nice.', time: '1d', icon: Icons.local_fire_department),
     ]);
 
-    people.addAll([
-      Person(name: 'Riya Sharma', mutual: '12 mutual friends'),
-      Person(name: 'Arjun Mehta', mutual: '8 mutual friends', friend: true),
-      Person(name: 'Neha Verma', mutual: '23 mutual friends'),
-      Person(name: 'Kabir Singh', mutual: '5 mutual friends'),
-      Person(name: 'Priya Nair', mutual: '17 mutual friends', friend: true),
+    groups.addAll([
+      Group(id: 'g1', name: 'Exam Stress', description: 'For anyone fighting exams right now.', members: 1200, joined: true),
+      Group(id: 'g2', name: 'Office Life', description: 'Vent about work, safely.', members: 840),
+      Group(id: 'g3', name: 'Night Owls', description: 'For the 2am thoughts.', members: 430),
     ]);
 
     statuses.addAll([
-      Status(
-        id: 's1',
-        author: 'Riya',
-        gradientIndex: 1,
-        caption: 'Good morning from the hills',
-        createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-      ),
-      Status(
-        id: 's2',
-        author: 'Arjun',
-        gradientIndex: 2,
-        caption: 'Late night thoughts',
-        createdAt: DateTime.now().subtract(const Duration(hours: 9)),
-      ),
-      Status(
-        id: 's3',
-        author: 'Neha',
-        gradientIndex: 3,
-        caption: 'Coffee and calm',
-        createdAt: DateTime.now().subtract(const Duration(hours: 20)),
-      ),
+      Status(id: 's1', author: 'Riya', gradientIndex: 1, caption: 'Good morning from the hills', createdAt: DateTime.now().subtract(const Duration(hours: 3))),
+      Status(id: 's2', author: 'Arjun', gradientIndex: 2, caption: 'Late night thoughts', createdAt: DateTime.now().subtract(const Duration(hours: 9))),
     ]);
+
+    interests.addAll({'Stressed': 4, 'Lonely': 3, 'Happy': 2});
 
     myPosts.addAll(posts.where((x) => x.anonymous).take(6));
   }
 
-  // ---- feed with scroll pagination ----
-  List<Post> get feed => posts.take(_visible).toList();
-  List<Post> get forYouFeed => forYou.take(_visible).toList();
-  List<Post> get hotFeed => trending.take(_visible).toList();
+  User userFor(String name) {
+    return users.firstWhere(
+      (u) => u.name.toLowerCase() == name.toLowerCase(),
+      orElse: () => me,
+    );
+  }
+
+  bool isFollowing(User u) => followingIds.contains(u.id);
+
+  void toggleFollow(User u) {
+    if (u.isMe) return;
+    if (followingIds.contains(u.id)) {
+      followingIds.remove(u.id);
+      u.followers -= 1;
+    } else {
+      followingIds.add(u.id);
+      u.followers += 1;
+    }
+    notifyListeners();
+  }
+
+  // ---- posts (with 1-month auto delete) ----
+  void purgeExpired() {
+    posts.removeWhere((p) => p.expired);
+    myPosts.removeWhere((p) => p.expired);
+  }
+
+  List<Post> get feed {
+    purgeExpired();
+    return posts.take(_visible).toList();
+  }
+
   bool get hasMore => _visible < posts.length;
   void loadMore() {
     if (!hasMore) return;
@@ -234,14 +312,32 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addPost(String text, String mood, bool anonymous) {
+  /// ~70% of the feed matches the moods this user engages with most.
+  List<Post> get interestFeed {
+    purgeExpired();
+    final top = interests.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final wanted = top.take(3).map((e) => e.key).toSet();
+    final match = posts.where((p) => wanted.contains(p.mood)).toList();
+    final other = posts.where((p) => !wanted.contains(p.mood)).toList();
+    final out = <Post>[];
+    final mCount = (_visible * 0.7).round();
+    out.addAll(match.take(mCount));
+    out.addAll(other.take(_visible - out.length));
+    if (out.length < _visible) out.addAll(match.skip(mCount).take(_visible - out.length));
+    return out;
+  }
+
+  void addPost(String text, String mood, bool anonymous, PostVisibility visibility, List<String> tags) {
     final post = Post(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
-      author: username,
+      author: me.name,
       anonymous: anonymous,
       mood: mood,
       text: text,
       time: 'now',
+      createdAt: DateTime.now(),
+      visibility: visibility,
+      tags: tags,
       views: 1,
     );
     posts.insert(0, post);
@@ -250,9 +346,16 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void deletePost(Post post) {
+    posts.remove(post);
+    myPosts.remove(post);
+    notifyListeners();
+  }
+
   void toggleLike(Post post) {
     post.liked = !post.liked;
     post.likes += post.liked ? 1 : -1;
+    if (post.liked) interests[post.mood] = (interests[post.mood] ?? 0) + 1;
     notifyListeners();
   }
 
@@ -263,12 +366,12 @@ class AppState extends ChangeNotifier {
   }
 
   void addComment(Post post, String text) {
-    post.comments.insert(0, Comment(author: username, text: text, time: 'now'));
+    post.comments.insert(0, Comment(author: me.name, text: text, time: 'now'));
     notifyListeners();
   }
 
   void addReply(Comment parent, String text) {
-    parent.replies.insert(0, Comment(author: username, text: text, time: 'now'));
+    parent.replies.insert(0, Comment(author: me.name, text: text, time: 'now'));
     notifyListeners();
   }
 
@@ -278,53 +381,86 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleFriend(Person person) {
-    person.friend = !person.friend;
+  // ---- groups ----
+  void toggleGroup(Group g) {
+    g.joined = !g.joined;
+    g.members += g.joined ? 1 : -1;
     notifyListeners();
   }
 
-  // ---- statuses (24h) ----
+  void addGroup(String name, String description) {
+    groups.insert(0, Group(id: DateTime.now().microsecondsSinceEpoch.toString(), name: name, description: description, members: 1, joined: true));
+    notifyListeners();
+  }
+
+  // ---- sharing ----
+  void share(Post post, {String? toGroup}) {
+    post.lifts += 1;
+    post.lifted = true;
+    notifyListeners();
+  }
+
+  // ---- statuses ----
   List<Status> get activeStatuses {
     statuses.removeWhere((s) => s.expired);
     return statuses;
   }
 
   void addStatus({Uint8List? imageBytes, String caption = '', int gradientIndex = 0}) {
-    statuses.insert(
-      0,
-      Status(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        author: username,
-        imageBytes: imageBytes,
-        caption: caption,
-        gradientIndex: gradientIndex,
-        createdAt: DateTime.now(),
-      ),
-    );
+    statuses.insert(0, Status(id: DateTime.now().microsecondsSinceEpoch.toString(), author: me.name, imageBytes: imageBytes, caption: caption, gradientIndex: gradientIndex, createdAt: DateTime.now()));
     notifyListeners();
   }
 
-  void removeStatus(Status s) {
-    statuses.remove(s);
-    notifyListeners();
+  // ---- topics ----
+  List<Topic> get trendingTopics {
+    final map = <String, int>{};
+    for (final p in posts) {
+      for (final t in p.tags) {
+        final tag = t.replaceAll('#', '');
+        if (tag.isEmpty) continue;
+        map[tag] = (map[tag] ?? 0) + 1;
+      }
+    }
+    final list = map.entries.map((e) => Topic(name: e.key, posts: e.value * 137 + 40)).toList();
+    list.sort((a, b) => b.posts.compareTo(a.posts));
+    return list.take(8).toList();
   }
+
+  List<Post> postsWithTag(String tag) =>
+      posts.where((p) => p.tags.any((t) => t.replaceAll('#', '') == tag)).toList();
+
+  // ---- analytics (demo) ----
+  int get totalViews => myPosts.fold(0, (s, p) => s + p.views);
+  int get totalLikes => myPosts.fold(0, (s, p) => s + p.likes);
+  int get totalComments => myPosts.fold(0, (s, p) => s + p.comments.length);
+  List<int> get viewsByDay => [12, 28, 19, 41, 33, 52, 47];
 
   // ---- ranking ----
   double _score(Post p) => p.views * 0.05 + p.likes * 1.0 + p.lifts * 2.5 + p.comments.length * 4.0;
 
   List<Post> get forYou {
+    purgeExpired();
     final list = [...posts];
     list.sort((a, b) => _score(b).compareTo(_score(a)));
     return list;
   }
 
   List<Post> get trending {
+    purgeExpired();
     final list = [...posts];
     list.sort((a, b) => (b.likes + b.lifts).compareTo(a.likes + a.lifts));
     return list;
   }
 
-  List<Post> byMood(String mood) => posts.where((p) => p.mood == mood).toList();
+  List<Post> get forYouFeed => forYou.take(_visible).toList();
+  List<Post> get hotFeed => trending.take(_visible).toList();
+
+  // ---- username generator ----
+  String suggestUsername(String name) {
+    final base = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final n = 100 + DateTime.now().millisecond % 900;
+    return '@${base.isEmpty ? 'user' : base}$n';
+  }
 }
 
 final AppState appState = AppState();

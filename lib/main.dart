@@ -33,8 +33,8 @@ class _RootShellState extends State<RootShell> {
   static const _screens = <Widget>[
     HomeScreen(),
     DiscoverScreen(),
+    GroupsScreen(),
     StatusScreen(),
-    NotificationsScreen(),
     ProfileScreen(),
   ];
 
@@ -58,8 +58,8 @@ class _BottomBar extends StatelessWidget {
     const items = <List<IconData>>[
       [Icons.home_outlined, Icons.home_rounded],
       [Icons.explore_outlined, Icons.explore_rounded],
+      [Icons.groups_outlined, Icons.groups_rounded],
       [Icons.auto_stories_outlined, Icons.auto_stories_rounded],
-      [Icons.notifications_none, Icons.notifications_rounded],
       [Icons.person_outline, Icons.person_rounded],
     ];
     return Container(

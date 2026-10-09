@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'theme.dart';
 import 'models.dart';
@@ -10,24 +10,65 @@ String fmt(int n) {
   return '$n';
 }
 
+IconData visibilityIcon(PostVisibility v) {
+  switch (v) {
+    case PostVisibility.public:
+      return Icons.public;
+    case PostVisibility.followers:
+      return Icons.people_alt_outlined;
+    case PostVisibility.private:
+      return Icons.lock_outline;
+  }
+}
+
 class Avatar extends StatelessWidget {
   final String label;
   final double size;
   final Color? color;
-  const Avatar({super.key, required this.label, this.size = 42, this.color});
+  final bool verified;
+  const Avatar({super.key, required this.label, this.size = 42, this.color, this.verified = false});
 
   @override
   Widget build(BuildContext context) {
     final c = color ?? Brand.blue;
+    return Stack(
+      children: [
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+          alignment: Alignment.center,
+          child: Text(
+            label.isNotEmpty ? label[0].toUpperCase() : '?',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: size * 0.4),
+          ),
+        ),
+        if (verified)
+          Positioned(
+            right: -1,
+            bottom: -1,
+            child: VerifiedBadge(size: size * 0.42),
+          ),
+      ],
+    );
+  }
+}
+
+class VerifiedBadge extends StatelessWidget {
+  final double size;
+  const VerifiedBadge({super.key, this.size = 15});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(color: c, shape: BoxShape.circle),
-      alignment: Alignment.center,
-      child: Text(
-        label.isNotEmpty ? label[0].toUpperCase() : '?',
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: size * 0.4),
+      decoration: BoxDecoration(
+        color: Brand.blue,
+        shape: BoxShape.circle,
+        border: Border.all(color: Palette.of(context).surface, width: size * 0.12),
       ),
+      child: Icon(Icons.check, size: size * 0.62, color: Colors.white),
     );
   }
 }
@@ -41,10 +82,7 @@ class MoodTag extends StatelessWidget {
     final c = moodColors[mood] ?? Brand.blue;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-      decoration: BoxDecoration(
-        color: c.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: BoxDecoration(color: c.withValues(alpha: 0.13), borderRadius: BorderRadius.circular(20)),
       child: Text(mood, style: TextStyle(color: c, fontSize: 11.5, fontWeight: FontWeight.w800)),
     );
   }
@@ -54,7 +92,8 @@ class SectionHeader extends StatelessWidget {
   final String title;
   final String? subtitle;
   final IconData? icon;
-  const SectionHeader({super.key, required this.title, this.subtitle, this.icon});
+  final Widget? trailing;
+  const SectionHeader({super.key, required this.title, this.subtitle, this.icon, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -63,23 +102,49 @@ class SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
       child: Row(
         children: [
-          if (icon != null) ...[
-            Icon(icon, size: 18, color: Brand.blue),
-            const SizedBox(width: 7),
-          ],
+          if (icon != null) ...[Icon(icon, size: 18, color: Brand.blue), const SizedBox(width: 7)],
           Text(title, style: TextStyle(color: p.text, fontSize: 16, fontWeight: FontWeight.w800)),
           if (subtitle != null) ...[
             const SizedBox(width: 6),
             Expanded(
               child: Text(subtitle!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: p.secondary, fontSize: 12.5)),
             ),
-          ],
+          ] else
+            const Spacer(),
+          if (trailing != null) trailing!,
         ],
       ),
     );
+  }
+}
+
+/// Renders text with tappable #hashtags.
+class TagText extends StatelessWidget {
+  final String text;
+  final TextStyle style;
+  final void Function(String tag) onTag;
+  const TagText({super.key, required this.text, required this.style, required this.onTag});
+
+  @override
+  Widget build(BuildContext context) {
+    final spans = <InlineSpan>[];
+    final parts = text.split(' ');
+    for (var i = 0; i < parts.length; i++) {
+      final w = parts[i];
+      final space = i == parts.length - 1 ? '' : ' ';
+      if (w.startsWith('#') && w.length > 1) {
+        spans.add(TextSpan(
+          text: '$w$space',
+          style: style.copyWith(color: Brand.blue, fontWeight: FontWeight.w700),
+          recognizer: TapGestureRecognizer()..onTap = () => onTag(w.substring(1)),
+        ));
+      } else {
+        spans.add(TextSpan(text: '$w$space', style: style));
+      }
+    }
+    return RichText(text: TextSpan(children: spans));
   }
 }
 
@@ -88,12 +153,16 @@ class StatAction extends StatelessWidget {
   final int value;
   final Color color;
   final VoidCallback onTap;
+  final bool showLabel;
+  final String? label;
   const StatAction({
     super.key,
     required this.icon,
     required this.value,
     required this.color,
     required this.onTap,
+    this.showLabel = false,
+    this.label,
   });
 
   @override
@@ -108,7 +177,7 @@ class StatAction extends StatelessWidget {
           children: [
             Icon(icon, size: 18, color: color),
             const SizedBox(width: 6),
-            Text(fmt(value),
+            Text(showLabel ? (label ?? '$value') : fmt(value),
                 style: TextStyle(color: color, fontSize: 12.5, fontWeight: FontWeight.w700)),
           ],
         ),
@@ -117,14 +186,90 @@ class StatAction extends StatelessWidget {
   }
 }
 
-class PostCard extends StatelessWidget {
-  final Post post;
-  final VoidCallback onTap;
-  const PostCard({super.key, required this.post, required this.onTap});
+class FollowButton extends StatelessWidget {
+  final User user;
+  const FollowButton({super.key, required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    if (user.isMe) return const SizedBox.shrink();
+    final following = appState.isFollowing(user);
+    return following
+        ? OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+            onPressed: () => appState.toggleFollow(user),
+            child: const Text('Following'),
+          )
+        : FilledButton(
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+            ),
+            onPressed: () => appState.toggleFollow(user),
+            child: const Text('Follow'),
+          );
+  }
+}
+
+class UserTile extends StatelessWidget {
+  final User user;
+  final VoidCallback? onTap;
+  const UserTile({super.key, required this.user, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
+    return Block(
+      onTap: onTap,
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          Avatar(label: user.name, size: 48, color: avatarColors[user.colorIndex], verified: user.verified),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(user.name, style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14.5)),
+                    if (user.verified) ...[const SizedBox(width: 4), const VerifiedBadge(size: 14)],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text('${user.handle}  ·  ${fmt(user.followers)} followers',
+                    style: TextStyle(color: p.secondary, fontSize: 12.5)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FollowButton(user: user),
+        ],
+      ),
+    );
+  }
+}
+
+class PostCard extends StatelessWidget {
+  final Post post;
+  final VoidCallback onTap;
+  final void Function(String tag)? onTag;
+  final void Function(User user)? onAuthor;
+  final VoidCallback? onShare;
+  const PostCard({
+    super.key,
+    required this.post,
+    required this.onTap,
+    this.onTag,
+    this.onAuthor,
+    this.onShare,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    final author = appState.userFor(post.author);
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       child: Block(
@@ -135,9 +280,14 @@ class PostCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Avatar(
+                GestureDetector(
+                  onTap: post.anonymous ? null : () => onAuthor?.call(author),
+                  child: Avatar(
                     label: post.anonymous ? 'A' : post.author,
-                    color: post.anonymous ? p.secondary : Brand.blue),
+                    color: post.anonymous ? p.secondary : avatarColors[author.colorIndex],
+                    verified: !post.anonymous && author.verified,
+                  ),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -147,31 +297,34 @@ class PostCard extends StatelessWidget {
                         children: [
                           Flexible(
                             child: Text(post.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    color: p.text,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 14.5)),
+                                maxLines: 1, overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14.5)),
                           ),
+                          if (!post.anonymous && author.verified) ...[
+                            const SizedBox(width: 4),
+                            const VerifiedBadge(size: 14),
+                          ],
                           if (post.anonymous) ...[
                             const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                              decoration: BoxDecoration(
-                                  color: Brand.blue.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(5)),
-                              child: const Text('Anon',
-                                  style: TextStyle(
-                                      color: Brand.blue,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800)),
+                              decoration: BoxDecoration(color: Brand.blue.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(5)),
+                              child: const Text('Anon', style: TextStyle(color: Brand.blue, fontSize: 10, fontWeight: FontWeight.w800)),
                             ),
                           ],
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(post.time, style: TextStyle(color: p.secondary, fontSize: 12)),
+                      Row(
+                        children: [
+                          Text(post.time, style: TextStyle(color: p.secondary, fontSize: 12)),
+                          const SizedBox(width: 5),
+                          Icon(visibilityIcon(post.visibility), size: 12, color: p.secondary),
+                          if (post.daysLeft <= 5) ...[
+                            const SizedBox(width: 6),
+                            Text('· ${post.daysLeft}d left', style: TextStyle(color: Brand.red, fontSize: 11)),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -179,7 +332,13 @@ class PostCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Text(post.text, style: TextStyle(color: p.text, fontSize: 15, height: 1.45)),
+            onTag != null
+                ? TagText(
+                    text: post.text,
+                    style: TextStyle(color: p.text, fontSize: 15, height: 1.45),
+                    onTag: onTag!,
+                  )
+                : Text(post.text, style: TextStyle(color: p.text, fontSize: 15, height: 1.45)),
             const SizedBox(height: 10),
             MoodTag(mood: post.mood),
             const SizedBox(height: 6),
@@ -189,33 +348,95 @@ class PostCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: StatAction(
-                      icon: Icons.visibility_outlined,
-                      value: post.views,
-                      color: p.secondary,
-                      onTap: onTap),
+                    icon: post.liked ? Icons.favorite : Icons.favorite_border,
+                    value: post.likes,
+                    color: post.liked ? Brand.red : p.secondary,
+                    onTap: () => appState.toggleLike(post),
+                  ),
                 ),
                 Expanded(
                   child: StatAction(
-                      icon: Icons.mode_comment_outlined,
-                      value: post.comments.length,
-                      color: p.secondary,
-                      onTap: onTap),
+                    icon: Icons.mode_comment_outlined,
+                    value: post.comments.length,
+                    color: p.secondary,
+                    onTap: onTap,
+                  ),
                 ),
                 Expanded(
                   child: StatAction(
-                      icon: Icons.repeat,
-                      value: post.lifts,
-                      color: post.lifted ? Brand.green : p.secondary,
-                      onTap: () => appState.toggleLift(post)),
+                    icon: Icons.repeat,
+                    value: post.lifts,
+                    color: post.lifted ? Brand.green : p.secondary,
+                    onTap: () => appState.toggleLift(post),
+                  ),
                 ),
                 Expanded(
                   child: StatAction(
-                      icon: post.liked ? Icons.favorite : Icons.favorite_border,
-                      value: post.likes,
-                      color: post.liked ? Brand.red : p.secondary,
-                      onTap: () => appState.toggleLike(post)),
+                    icon: Icons.visibility_outlined,
+                    value: post.views,
+                    color: p.secondary,
+                    onTap: onTap,
+                  ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A feed-native sponsored slot (looks like a post, is clearly marked).
+class SponsoredCard extends StatelessWidget {
+  const SponsoredCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      child: Block(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(gradient: Brand.gradient, borderRadius: BorderRadius.circular(12)),
+                  child: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Sponsored', style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14)),
+                      Text('Based on your interests', style: TextStyle(color: p.secondary, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(6)),
+                  child: Text('Ad', style: TextStyle(color: p.secondary, fontSize: 11, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text('Feeling overwhelmed? A 5-minute guided breathing break can help.',
+                style: TextStyle(color: p.text, fontSize: 14.5, height: 1.4)),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8)),
+                onPressed: () {},
+                child: const Text('Learn more'),
+              ),
             ),
           ],
         ),
@@ -228,12 +449,7 @@ class CommentTile extends StatelessWidget {
   final Comment comment;
   final VoidCallback onReply;
   final VoidCallback onLike;
-  const CommentTile({
-    super.key,
-    required this.comment,
-    required this.onReply,
-    required this.onLike,
-  });
+  const CommentTile({super.key, required this.comment, required this.onReply, required this.onLike});
 
   @override
   Widget build(BuildContext context) {
@@ -254,25 +470,18 @@ class CommentTile extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(comment.author,
-                            style: TextStyle(
-                                color: p.text, fontWeight: FontWeight.w800, fontSize: 13.5)),
+                        Text(comment.author, style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 13.5)),
                         const Spacer(),
-                        Text(comment.time,
-                            style: TextStyle(color: p.secondary, fontSize: 11.5)),
+                        Text(comment.time, style: TextStyle(color: p.secondary, fontSize: 11.5)),
                       ],
                     ),
                     const SizedBox(height: 3),
-                    Text(comment.text,
-                        style: TextStyle(color: p.text, fontSize: 14, height: 1.35)),
+                    Text(comment.text, style: TextStyle(color: p.text, fontSize: 14, height: 1.35)),
                     const SizedBox(height: 5),
                     Row(
                       children: [
-                        _mini(context,
-                            comment.liked ? Icons.favorite : Icons.favorite_border,
-                            '${comment.likes}',
-                            comment.liked ? Brand.red : p.secondary,
-                            onLike),
+                        _mini(context, comment.liked ? Icons.favorite : Icons.favorite_border, '${comment.likes}',
+                            comment.liked ? Brand.red : p.secondary, onLike),
                         const SizedBox(width: 16),
                         _mini(context, Icons.reply, 'Reply', p.secondary, onReply),
                       ],
@@ -296,17 +505,13 @@ class CommentTile extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Text(r.author,
-                                style: TextStyle(
-                                    color: p.text, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                            Text(r.author, style: TextStyle(color: p.text, fontWeight: FontWeight.w700, fontSize: 12.5)),
                             const Spacer(),
-                            Text(r.time,
-                                style: TextStyle(color: p.secondary, fontSize: 11)),
+                            Text(r.time, style: TextStyle(color: p.secondary, fontSize: 11)),
                           ],
                         ),
                         const SizedBox(height: 2),
-                        Text(r.text,
-                            style: TextStyle(color: p.text, fontSize: 13.5, height: 1.35)),
+                        Text(r.text, style: TextStyle(color: p.text, fontSize: 13.5, height: 1.35)),
                       ],
                     ),
                   ),
@@ -330,8 +535,7 @@ class CommentTile extends StatelessWidget {
           children: [
             Icon(icon, size: 15, color: color),
             const SizedBox(width: 5),
-            Text(label,
-                style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+            Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
           ],
         ),
       ),
@@ -380,18 +584,13 @@ class StatusRing extends StatelessWidget {
                           child: add
                               ? Icon(Icons.add, color: Brand.blue, size: 26)
                               : Text(label[0].toUpperCase(),
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 20)),
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20)),
                         ),
                 ),
               ),
             ),
             const SizedBox(height: 6),
-            Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: p.text, fontSize: 11.5, fontWeight: FontWeight.w600)),
           ],
         ),
@@ -416,9 +615,7 @@ class EmptyState extends StatelessWidget {
           children: [
             Icon(icon, size: 44, color: p.secondary),
             const SizedBox(height: 12),
-            Text(message,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: p.secondary, fontSize: 14)),
+            Text(message, textAlign: TextAlign.center, style: TextStyle(color: p.secondary, fontSize: 14)),
           ],
         ),
       ),
