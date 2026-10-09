@@ -9,143 +9,80 @@ void openPost(BuildContext context, Post post) {
   );
 }
 
-String shortNum(int n) {
-  if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
-  if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
-  return '$n';
+void openCompose(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => const ComposeScreen()),
+  );
 }
 
 // ---------------------------------------------------------------- HOME
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int _filter = 0;
-  static const _filters = ['For You', 'Trending', 'New', ...moodList];
-
-  List<Post> _list() {
-    switch (_filter) {
-      case 0:
-        return appState.forYou;
-      case 1:
-        return appState.trending;
-      case 2:
-        return appState.posts;
-      default:
-        return appState.byMood(_filters[_filter]);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 16,
+        titleSpacing: 12,
         title: Row(
           children: [
             Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                gradient: Brand.gradient,
-                borderRadius: BorderRadius.circular(9),
-              ),
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(color: Brand.blue, shape: BoxShape.circle),
               alignment: Alignment.center,
               child: const Text('V',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
             ),
             const SizedBox(width: 10),
-            Text('Vent',
-                style: TextStyle(color: p.text, fontWeight: FontWeight.w900, fontSize: 20)),
+            Expanded(
+              child: Container(
+                height: 38,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: p.surfaceAlt,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.search, size: 18, color: p.secondary),
+                    const SizedBox(width: 8),
+                    Text('Search Vent', style: TextStyle(color: p.secondary, fontSize: 14)),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
+          IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none)),
           const SizedBox(width: 4),
         ],
       ),
       body: ListenableBuilder(
         listenable: appState,
         builder: (context, _) {
-          final posts = _list();
+          final rec = appState.forYou.take(2).toList();
+          final recIds = rec.map((e) => e.id).toSet();
+          final rest = appState.posts.where((e) => !recIds.contains(e.id)).toList();
           return ListView(
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: EdgeInsets.zero,
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('How are you feeling today?',
-                        style: TextStyle(
-                            color: p.text,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            height: 1.2)),
-                    const SizedBox(height: 4),
-                    Text('Say it anonymously. Someone out there gets it.',
-                        style: TextStyle(color: p.secondary, fontSize: 13.5)),
-                  ],
-                ),
-              ),
-              _chips(context),
-              if (_filter == 0)
-                const SectionHeader(
-                  icon: Icons.auto_awesome,
-                  title: 'Recommended for you',
-                  subtitle: 'Picked by AI from what is resonating',
-                )
-              else if (_filter == 1)
-                const SectionHeader(icon: Icons.trending_up, title: 'Trending now')
-              else if (_filter >= 3)
-                SectionHeader(icon: Icons.local_fire_department, title: '${_filters[_filter]} posts'),
-              if (posts.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 48),
-                  child: EmptyState(icon: Icons.inbox_outlined, message: 'Nothing here yet.'),
-                ),
-              ...posts.map((post) => PostCard(post: post, onTap: () => openPost(context, post))),
+              const SizedBox(height: 8),
+              const CreateBox(),
+              const SizedBox(height: 8),
+              const StoriesRow(),
+              const SizedBox(height: 4),
+              const SectionHeader(
+                  icon: Icons.auto_awesome, title: 'Suggested for you', subtitle: 'Picked for you'),
+              ...rec.map((post) => PostCard(post: post, onTap: () => openPost(context, post))),
+              const SizedBox(height: 8),
+              const SectionHeader(title: 'Latest'),
+              ...rest.map((post) => PostCard(post: post, onTap: () => openPost(context, post))),
+              const SizedBox(height: 20),
             ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _chips(BuildContext context) {
-    final p = Palette.of(context);
-    return SizedBox(
-      height: 42,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _filters.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final selected = i == _filter;
-          return ChoiceChip(
-            label: Text(_filters[i]),
-            avatar: i == 0
-                ? Icon(Icons.auto_awesome,
-                    size: 15, color: selected ? Colors.white : Brand.violet)
-                : null,
-            selected: selected,
-            onSelected: (_) => setState(() => _filter = i),
-            showCheckmark: false,
-            labelStyle: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: selected ? Colors.white : p.text),
-            selectedColor: Brand.violet,
-            backgroundColor: p.surface,
-            side: BorderSide(color: p.border),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           );
         },
       ),
@@ -153,30 +90,188 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// -------------------------------------------------------------- SEARCH
-
-class SearchScreen extends StatelessWidget {
-  const SearchScreen({super.key});
+class CreateBox extends StatelessWidget {
+  const CreateBox({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return FbCard(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const Avatar(label: 'A'),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => openCompose(context),
+                    borderRadius: BorderRadius.circular(22),
+                    child: Container(
+                      height: 42,
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: p.surfaceAlt,
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: Text('What is on your mind, Anjaan?',
+                          style: TextStyle(color: p.secondary, fontSize: 15)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Divider(height: 1, color: p.divider),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Expanded(child: _quick(context, Icons.videocam_outlined, 'Live', Brand.red)),
+                Expanded(child: _quick(context, Icons.photo_library_outlined, 'Photo', Brand.green)),
+                Expanded(
+                    child: _quick(context, Icons.emoji_emotions_outlined, 'Feeling',
+                        const Color(0xFFF7B928))),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _quick(BuildContext context, IconData icon, String label, Color color) {
+    final p = Palette.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 19, color: color),
+          const SizedBox(width: 7),
+          Text(label,
+              style: TextStyle(color: p.secondary, fontSize: 13.5, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+class StoriesRow extends StatelessWidget {
+  const StoriesRow({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final people = appState.people;
+    return SizedBox(
+      height: 106,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          const StoryCircle(label: 'Create story', add: true),
+          ...people.map((person) => Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: StoryCircle(label: person.name.split(' ').first, color: Brand.blueDark),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+// ------------------------------------------------------------- FRIENDS
+
+class FriendsScreen extends StatelessWidget {
+  const FriendsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Search')),
+      appBar: AppBar(title: const Text('Friends')),
       body: ListenableBuilder(
         listenable: appState,
         builder: (context, _) {
           return ListView(
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.only(bottom: 20),
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 10, 16, 6),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search posts, moods, people...',
-                    prefixIcon: Icon(Icons.search, size: 20),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                child: Text('People you may know',
+                    style: TextStyle(color: p.text, fontSize: 16, fontWeight: FontWeight.w800)),
+              ),
+              ...appState.people.map(
+                (person) => Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                  child: FbCard(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Avatar(label: person.name, size: 52),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(person.name,
+                                    style: TextStyle(
+                                        color: p.text,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15)),
+                                const SizedBox(height: 2),
+                                Text(person.mutual,
+                                    style: TextStyle(color: p.secondary, fontSize: 12.5)),
+                              ],
+                            ),
+                          ),
+                          person.friend
+                              ? OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  ),
+                                  onPressed: () => appState.toggleFriend(person),
+                                  child: const Text('Friends'),
+                                )
+                              : FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                                  ),
+                                  onPressed: () => appState.toggleFriend(person),
+                                  child: const Text('Add friend'),
+                                ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// --------------------------------------------------------------- WATCH
+
+class WatchScreen extends StatelessWidget {
+  const WatchScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Watch')),
+      body: ListenableBuilder(
+        listenable: appState,
+        builder: (context, _) {
+          return ListView(
+            padding: const EdgeInsets.only(top: 8, bottom: 20),
+            children: [
               const SectionHeader(icon: Icons.trending_up, title: 'Trending now'),
               ...appState.trending
                   .map((post) => PostCard(post: post, onTap: () => openPost(context, post))),
@@ -188,16 +283,83 @@ class SearchScreen extends StatelessWidget {
   }
 }
 
-// -------------------------------------------------------------- CREATE
+// -------------------------------------------------------- NOTIFICATIONS
 
-class CreatePostScreen extends StatefulWidget {
-  const CreatePostScreen({super.key});
+class NotificationsScreen extends StatelessWidget {
+  const NotificationsScreen({super.key});
 
   @override
-  State<CreatePostScreen> createState() => _CreatePostScreenState();
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Notifications')),
+      body: ListenableBuilder(
+        listenable: appState,
+        builder: (context, _) {
+          return ListView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: appState.notifications
+                .map(
+                  (n) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: FbCard(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Stack(
+                              children: [
+                                Avatar(label: 'A', size: 44),
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(3),
+                                    decoration: BoxDecoration(
+                                        color: Brand.blue, shape: BoxShape.circle),
+                                    child: Icon(n.icon, size: 11, color: Colors.white),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(n.text,
+                                      style: TextStyle(
+                                          color: p.text, fontSize: 14, height: 1.3)),
+                                  const SizedBox(height: 3),
+                                  Text(n.time,
+                                      style: TextStyle(color: Brand.blue, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          );
+        },
+      ),
+    );
+  }
 }
 
-class _CreatePostScreenState extends State<CreatePostScreen> {
+// ------------------------------------------------------------- COMPOSE
+
+class ComposeScreen extends StatefulWidget {
+  const ComposeScreen({super.key});
+
+  @override
+  State<ComposeScreen> createState() => _ComposeScreenState();
+}
+
+class _ComposeScreenState extends State<ComposeScreen> {
   final _controller = TextEditingController();
   String _mood = moodList.first;
   late bool _anonymous = appState.anonymousByDefault;
@@ -210,78 +372,75 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   void _submit() {
     final text = _controller.text.trim();
-    if (text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Write something first')),
-      );
-      return;
-    }
+    if (text.isEmpty) return;
     appState.addPost(text, _mood, _anonymous);
     _controller.clear();
-    FocusScope.of(context).unfocus();
-    setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Posted')),
-    );
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Posted')));
   }
 
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
-    final len = _controller.text.characters.length;
     return Scaffold(
       appBar: AppBar(title: const Text('Create post')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
         children: [
-          SoftCard(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Avatar(label: _anonymous ? 'A' : appState.username[0], size: 40),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(_anonymous ? 'Anjaan' : appState.username,
-                            style: TextStyle(
-                                color: p.text, fontWeight: FontWeight.w800, fontSize: 14.5)),
-                        Text(_anonymous ? '@anjaan' : appState.handle,
-                            style: TextStyle(color: p.secondary, fontSize: 12.5)),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _controller,
-                  onChanged: (_) => setState(() {}),
-                  maxLines: 8,
-                  maxLength: 300,
-                  style: TextStyle(color: p.text, fontSize: 16.5, height: 1.45),
-                  decoration: const InputDecoration(
-                    hintText: 'What is on your mind?',
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    counterText: '',
+          FbCard(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Avatar(label: _anonymous ? 'A' : appState.username[0],
+                          color: _anonymous ? p.secondary : Brand.blue),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(_anonymous ? 'Anjaan' : appState.username,
+                              style: TextStyle(
+                                  color: p.text, fontWeight: FontWeight.w700, fontSize: 14.5)),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                    color: p.surfaceAlt,
+                                    borderRadius: BorderRadius.circular(4)),
+                                child: Text('Public',
+                                    style: TextStyle(color: p.secondary, fontSize: 11)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text('$len/300',
-                      style: TextStyle(
-                          color: len > 280 ? Brand.pink : p.secondary, fontSize: 12.5)),
-                ),
-              ],
+                  TextField(
+                    controller: _controller,
+                    onChanged: (_) => setState(() {}),
+                    maxLines: 7,
+                    maxLength: 300,
+                    style: TextStyle(color: p.text, fontSize: 17, height: 1.4),
+                    decoration: const InputDecoration(
+                      hintText: 'What is on your mind?',
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      counterText: '',
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 18),
-          Text('Pick a mood',
+          const SizedBox(height: 14),
+          Text('Add a mood',
               style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w800)),
           const SizedBox(height: 10),
           Wrap(
@@ -297,7 +456,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 selectedColor: c.withValues(alpha: 0.18),
                 labelStyle: TextStyle(
                     color: selected ? c : p.secondary,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     fontSize: 12.5),
                 side: BorderSide(color: selected ? c : p.border),
                 backgroundColor: p.surface,
@@ -305,23 +464,24 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               );
             }).toList(),
           ),
-          const SizedBox(height: 18),
-          SoftCard(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
+          const SizedBox(height: 14),
+          FbCard(
             child: SwitchListTile(
               value: _anonymous,
               onChanged: (v) => setState(() => _anonymous = v),
               title: Text('Post anonymously',
-                  style: TextStyle(fontSize: 14.5, color: p.text, fontWeight: FontWeight.w700)),
+                  style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w700)),
               subtitle: Text('Your name will not be shown',
-                  style: TextStyle(fontSize: 12.5, color: p.secondary)),
+                  style: TextStyle(color: p.secondary, fontSize: 12.5)),
             ),
           ),
-          const SizedBox(height: 22),
-          GradientButton(
-            label: 'Post',
-            icon: Icons.send_rounded,
-            onTap: _controller.text.trim().isEmpty ? null : _submit,
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _controller.text.trim().isEmpty ? null : _submit,
+              child: const Text('Post'),
+            ),
           ),
         ],
       ),
@@ -369,51 +529,69 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             children: [
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.only(top: 8),
                   children: [
                     PostCard(post: post, onTap: () {}),
-                    const SectionHeader(title: 'Replies'),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
+                      child: Text('Comments',
+                          style: TextStyle(
+                              color: p.text, fontSize: 15.5, fontWeight: FontWeight.w800)),
+                    ),
                     if (post.comments.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 24),
                         child: EmptyState(
                             icon: Icons.chat_bubble_outline,
-                            message: 'No replies yet. Be the first.'),
+                            message: 'No comments yet. Be the first.'),
                       ),
                     ...post.comments.map(
                       (c) => Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-                        child: SoftCard(
-                          padding: const EdgeInsets.all(14),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Avatar(label: c.author, size: 38),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(c.author,
-                                            style: TextStyle(
-                                                color: p.text,
-                                                fontWeight: FontWeight.w800,
-                                                fontSize: 13.5)),
-                                        Text('  ·  ${c.time}',
-                                            style: TextStyle(
-                                                color: p.secondary, fontSize: 12)),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(c.text,
-                                        style: TextStyle(
-                                            color: p.text, fontSize: 14.5, height: 1.4)),
-                                  ],
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                        child: FbCard(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Avatar(label: c.author, size: 36),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: p.surfaceAlt,
+                                          borderRadius: BorderRadius.circular(14),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(c.author,
+                                                style: TextStyle(
+                                                    color: p.text,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 13)),
+                                            const SizedBox(height: 2),
+                                            Text(c.text,
+                                                style: TextStyle(
+                                                    color: p.text,
+                                                    fontSize: 14,
+                                                    height: 1.35)),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(c.time,
+                                          style: TextStyle(color: p.secondary, fontSize: 11.5)),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -426,10 +604,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 top: false,
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                  decoration: BoxDecoration(
-                    color: p.bg,
-                    border: Border(top: BorderSide(color: p.border)),
-                  ),
+                  color: p.surface,
                   child: Row(
                     children: [
                       const Avatar(label: 'A', size: 36),
@@ -437,7 +612,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       Expanded(
                         child: TextField(
                           controller: _controller,
-                          decoration: const InputDecoration(hintText: 'Write a reply...'),
+                          decoration: const InputDecoration(hintText: 'Write a comment...'),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -455,67 +630,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 }
 
-// -------------------------------------------------------- NOTIFICATIONS
-
-class NotificationsScreen extends StatelessWidget {
-  const NotificationsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Palette.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Activity')),
-      body: ListenableBuilder(
-        listenable: appState,
-        builder: (context, _) {
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
-            children: appState.notifications
-                .map(
-                  (n) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: SoftCard(
-                      padding: const EdgeInsets.all(14),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              gradient: Brand.gradient,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(n.icon, size: 20, color: Colors.white),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(n.text,
-                                    style: TextStyle(
-                                        color: p.text, fontSize: 14, height: 1.3)),
-                                const SizedBox(height: 3),
-                                Text(n.time,
-                                    style: TextStyle(color: p.secondary, fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          );
-        },
-      ),
-    );
-  }
-}
-
 // ------------------------------------------------------------- PROFILE
-// X-style: gradient banner, overlapping avatar, bio, stats, tabs, post list.
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -529,7 +644,7 @@ class ProfileScreen extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Profile'),
           actions: [
-            IconButton(onPressed: () {}, icon: const Icon(Icons.settings_outlined)),
+            IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
             const SizedBox(width: 4),
           ],
         ),
@@ -537,7 +652,7 @@ class ProfileScreen extends StatelessWidget {
           children: [
             _header(context, p),
             const TabBar(
-              tabs: [Tab(text: 'Posts'), Tab(text: 'Replies'), Tab(text: 'Media'), Tab(text: 'Likes')],
+              tabs: [Tab(text: 'Posts'), Tab(text: 'About'), Tab(text: 'Friends'), Tab(text: 'Photos')],
             ),
             Expanded(
               child: TabBarView(
@@ -549,10 +664,10 @@ class ProfileScreen extends StatelessWidget {
                       if (mine.isEmpty) {
                         return const EmptyState(
                             icon: Icons.edit_note,
-                            message: 'No posts yet. Tap Post to write one.');
+                            message: 'No posts yet. Tap the create box to write one.');
                       }
                       return ListView(
-                        padding: const EdgeInsets.only(top: 12, bottom: 24),
+                        padding: const EdgeInsets.only(top: 8, bottom: 20),
                         children: mine
                             .map((post) =>
                                 PostCard(post: post, onTap: () => openPost(context, post)))
@@ -560,9 +675,9 @@ class ProfileScreen extends StatelessWidget {
                       );
                     },
                   ),
-                  const EmptyState(icon: Icons.chat_bubble_outline, message: 'No replies yet.'),
-                  const EmptyState(icon: Icons.perm_media_outlined, message: 'No media yet.'),
-                  const EmptyState(icon: Icons.favorite_border, message: 'No likes yet.'),
+                  _about(context, p),
+                  _friends(context, p),
+                  const EmptyState(icon: Icons.photo_library_outlined, message: 'No photos yet.'),
                 ],
               ),
             ),
@@ -574,94 +689,101 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _header(BuildContext context, Palette p) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          height: 152,
+          height: 148,
           child: Stack(
             children: [
-              Container(height: 112, decoration: const BoxDecoration(gradient: Brand.gradient)),
+              Container(height: 140, decoration: const BoxDecoration(gradient: Brand.cover)),
               Positioned(
-                left: 16,
-                top: 70,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: p.bg),
-                  child: const Avatar(label: 'A', size: 84),
+                left: 0,
+                right: 0,
+                top: 86,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: p.surface),
+                    child: const Avatar(label: 'A', size: 96),
+                  ),
                 ),
               ),
             ],
           ),
         ),
+        const SizedBox(height: 6),
+        Text(appState.username,
+            style: TextStyle(color: p.text, fontSize: 22, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 2),
+        Text('${appState.friends} friends',
+            style: TextStyle(color: p.secondary, fontSize: 13.5)),
+        const SizedBox(height: 12),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(appState.username,
-                            style: TextStyle(
-                                color: p.text, fontSize: 20, fontWeight: FontWeight.w800)),
-                        Text(appState.handle,
-                            style: TextStyle(color: p.secondary, fontSize: 14)),
-                      ],
-                    ),
-                  ),
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                    ),
-                    onPressed: () {},
-                    child: const Text('Edit profile'),
-                  ),
-                ],
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () => openCompose(context),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add to story'),
+                ),
               ),
-              const SizedBox(height: 10),
-              Text(appState.bio, style: TextStyle(color: p.text, fontSize: 14, height: 1.4)),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(Icons.calendar_today_outlined, size: 14, color: p.secondary),
-                  const SizedBox(width: 6),
-                  Text('Joined October 2026',
-                      style: TextStyle(color: p.secondary, fontSize: 13)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _count(context, shortNum(appState.following), 'Following'),
-                  const SizedBox(width: 18),
-                  _count(context, shortNum(appState.followers), 'Followers'),
-                  const SizedBox(width: 18),
-                  _count(context, '${appState.myPosts.length}', 'Posts'),
-                ],
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {},
+                  child: const Text('Edit profile'),
+                ),
               ),
             ],
           ),
         ),
+        const SizedBox(height: 12),
       ],
     );
   }
 
-  Widget _count(BuildContext context, String value, String label) {
-    final p = Palette.of(context);
-    return RichText(
-      text: TextSpan(
-        style: TextStyle(color: p.secondary, fontSize: 13.5),
-        children: [
-          TextSpan(
-              text: value,
-              style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14)),
-          TextSpan(text: '  $label'),
-        ],
-      ),
+  Widget _about(BuildContext context, Palette p) {
+    Widget row(IconData icon, String text) => Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: p.secondary),
+              const SizedBox(width: 12),
+              Expanded(child: Text(text, style: TextStyle(color: p.text, fontSize: 14))),
+            ],
+          ),
+        );
+    return ListView(
+      children: [
+        row(Icons.info_outline, appState.bio),
+        row(Icons.calendar_today_outlined, 'Joined October 2026'),
+        row(Icons.location_on_outlined, 'Lives in India'),
+        row(Icons.local_fire_department_outlined, '${appState.streak}-day streak'),
+      ],
+    );
+  }
+
+  Widget _friends(BuildContext context, Palette p) {
+    return ListView(
+      children: appState.people
+          .map(
+            (person) => Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Row(
+                children: [
+                  Avatar(label: person.name, size: 46),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(person.name,
+                        style: TextStyle(
+                            color: p.text, fontSize: 14.5, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 }

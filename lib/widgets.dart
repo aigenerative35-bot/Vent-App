@@ -5,14 +5,16 @@ import 'models.dart';
 class Avatar extends StatelessWidget {
   final String label;
   final double size;
-  const Avatar({super.key, required this.label, this.size = 44});
+  final Color? color;
+  const Avatar({super.key, required this.label, this.size = 40, this.color});
 
   @override
   Widget build(BuildContext context) {
+    final c = color ?? Brand.blue;
     return Container(
       width: size,
       height: size,
-      decoration: const BoxDecoration(shape: BoxShape.circle, gradient: Brand.gradient),
+      decoration: BoxDecoration(color: c, shape: BoxShape.circle),
       alignment: Alignment.center,
       child: Text(
         label.isNotEmpty ? label[0].toUpperCase() : '?',
@@ -28,15 +30,15 @@ class MoodChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = moodColors[mood] ?? Brand.violet;
+    final c = moodColors[mood] ?? Brand.blue;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
-        color: c.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(20),
+        color: c.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(mood,
-          style: TextStyle(color: c, fontSize: 11.5, fontWeight: FontWeight.w800)),
+          style: TextStyle(color: c, fontSize: 11.5, fontWeight: FontWeight.w700)),
     );
   }
 }
@@ -51,231 +53,27 @@ class SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
       child: Row(
         children: [
           if (icon != null) ...[
-            ShaderMask(
-              shaderCallback: (r) => Brand.gradient.createShader(r),
-              child: Icon(icon, size: 20, color: Colors.white),
-            ),
-            const SizedBox(width: 8),
+            Icon(icon, size: 18, color: Brand.blue),
+            const SizedBox(width: 7),
           ],
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: TextStyle(color: p.text, fontSize: 17, fontWeight: FontWeight.w800)),
-                if (subtitle != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(subtitle!,
-                        style: TextStyle(color: p.secondary, fontSize: 12.5)),
-                  ),
-              ],
+          Text(title,
+              style: TextStyle(color: p.text, fontSize: 15.5, fontWeight: FontWeight.w800)),
+          if (subtitle != null) ...[
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: p.secondary, fontSize: 12.5)),
             ),
-          ),
+          ],
         ],
       ),
     );
-  }
-}
-
-class GradientButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback? onTap;
-  const GradientButton({super.key, required this.label, required this.icon, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: onTap == null ? 0.5 : 1,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: Brand.gradient,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, size: 19, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Text(label,
-                      style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class PostCard extends StatelessWidget {
-  final Post post;
-  final VoidCallback onTap;
-  const PostCard({super.key, required this.post, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Palette.of(context);
-    final mc = moodColors[post.mood] ?? Brand.violet;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-      child: SoftCard(
-        onTap: onTap,
-        padding: EdgeInsets.zero,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 3,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [mc, mc.withValues(alpha: 0.15)],
-                ),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Avatar(label: post.anonymous ? 'A' : post.author, size: 42),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(post.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    color: p.text,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 14.5)),
-                            Text('${post.handle}  ·  ${post.time}',
-                                style: TextStyle(color: p.secondary, fontSize: 12.5)),
-                          ],
-                        ),
-                      ),
-                      MoodChip(mood: post.mood),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(post.text,
-                      style: TextStyle(color: p.text, fontSize: 15.5, height: 1.45)),
-                  const SizedBox(height: 10),
-                  ActionRow(post: post, onComment: onTap),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class ActionRow extends StatelessWidget {
-  final Post post;
-  final VoidCallback onComment;
-  const ActionRow({super.key, required this.post, required this.onComment});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = Palette.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: _Action(
-                icon: Icons.mode_comment_outlined,
-                count: post.comments.length,
-                color: p.secondary,
-                onTap: onComment),
-          ),
-        ),
-        Expanded(
-          child: Align(
-            alignment: Alignment.center,
-            child: _Action(
-                icon: Icons.repeat,
-                count: post.reposts,
-                color: post.reposted ? Brand.green : p.secondary,
-                onTap: () => appState.toggleRepost(post)),
-          ),
-        ),
-        Expanded(
-          child: Align(
-            alignment: Alignment.center,
-            child: _Action(
-                icon: post.liked ? Icons.favorite : Icons.favorite_border,
-                count: post.likes,
-                color: post.liked ? Brand.pink : p.secondary,
-                onTap: () => appState.toggleLike(post)),
-          ),
-        ),
-        Expanded(
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: _Action(
-                icon: Icons.ios_share, count: null, color: p.secondary, onTap: () {}),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Action extends StatelessWidget {
-  final IconData icon;
-  final int? count;
-  final Color color;
-  final VoidCallback onTap;
-  const _Action({required this.icon, required this.count, required this.color, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 19, color: color),
-            if (count != null) ...[
-              const SizedBox(width: 6),
-              Text(_short(count!),
-                  style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w700)),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  static String _short(int n) {
-    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
-    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
-    return '$n';
   }
 }
 
@@ -293,11 +91,208 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 42, color: p.secondary),
+            Icon(icon, size: 44, color: p.secondary),
             const SizedBox(height: 12),
             Text(message,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: p.secondary, fontSize: 14)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Facebook post: header (avatar, name, time + globe), body, then
+/// Like / Comment / Share.
+class PostCard extends StatelessWidget {
+  final Post post;
+  final VoidCallback onTap;
+  const PostCard({super.key, required this.post, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return FbCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+            child: Row(
+              children: [
+                Avatar(
+                    label: post.anonymous ? 'A' : post.author,
+                    color: post.anonymous ? p.secondary : Brand.blue),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(post.name,
+                          style: TextStyle(
+                              color: p.text, fontWeight: FontWeight.w700, fontSize: 14.5)),
+                      const SizedBox(height: 1),
+                      Row(
+                        children: [
+                          Text(post.time,
+                              style: TextStyle(color: p.secondary, fontSize: 12)),
+                          const SizedBox(width: 5),
+                          Icon(Icons.public, size: 12, color: p.secondary),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.more_horiz, color: p.secondary),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(post.text,
+                    style: TextStyle(color: p.text, fontSize: 15, height: 1.4)),
+                const SizedBox(height: 10),
+                MoodChip(mood: post.mood),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: p.divider),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: ActionRow(post: post, onComment: onTap),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ActionRow extends StatelessWidget {
+  final Post post;
+  final VoidCallback onComment;
+  const ActionRow({super.key, required this.post, required this.onComment});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: FbAction(
+            icon: post.liked ? Icons.thumb_up_alt : Icons.thumb_up_alt_outlined,
+            label: 'Like',
+            color: post.liked ? Brand.blue : p.secondary,
+            onTap: () => appState.toggleLike(post),
+          ),
+        ),
+        Expanded(
+          child: FbAction(
+            icon: Icons.mode_comment_outlined,
+            label: 'Comment',
+            color: p.secondary,
+            onTap: onComment,
+          ),
+        ),
+        Expanded(
+          child: FbAction(
+            icon: Icons.share_outlined,
+            label: 'Share',
+            color: post.reposted ? Brand.green : p.secondary,
+            onTap: () => appState.toggleShare(post),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class FbAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const FbAction({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 19, color: color),
+            const SizedBox(width: 7),
+            Text(label,
+                style: TextStyle(color: color, fontSize: 13.5, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A circular story at the top of the feed.
+class StoryCircle extends StatelessWidget {
+  final String label;
+  final Color color;
+  final bool add;
+  final VoidCallback? onTap;
+  const StoryCircle({
+    super.key,
+    required this.label,
+    this.color = Brand.blue,
+    this.add = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 74,
+        child: Column(
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: Brand.gradient,
+              ),
+              padding: const EdgeInsets.all(2.5),
+              child: Container(
+                decoration: BoxDecoration(shape: BoxShape.circle, color: p.surface),
+                padding: const EdgeInsets.all(2),
+                child: Container(
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+                  alignment: Alignment.center,
+                  child: add
+                      ? Icon(Icons.add, color: Colors.white, size: 26)
+                      : Text(label[0].toUpperCase(),
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: p.text, fontSize: 11.5, fontWeight: FontWeight.w600)),
           ],
         ),
       ),

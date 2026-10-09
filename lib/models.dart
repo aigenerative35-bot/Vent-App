@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
-import 'theme.dart';
 
 class Comment {
   final String author;
   final String text;
   final String time;
   Comment({required this.author, required this.text, required this.time});
+}
+
+class Person {
+  final String name;
+  final String mutual;
+  bool friend;
+  Person({required this.name, required this.mutual, this.friend = false});
 }
 
 class Post {
@@ -17,7 +23,7 @@ class Post {
   final String time;
   int likes;
   bool liked;
-  int reposts;
+  int reposts; // shares
   bool reposted;
   final List<Comment> comments;
 
@@ -36,7 +42,6 @@ class Post {
   }) : comments = comments ?? [];
 
   String get name => anonymous ? 'Anjaan' : author;
-
   String get handle => anonymous ? '@anjaan' : '@${author.toLowerCase()}';
 }
 
@@ -62,18 +67,18 @@ const Map<String, Color> moodColors = {
   'Stressed': Color(0xFFF59E0B),
   'Happy': Color(0xFF22C55E),
   'Lonely': Color(0xFF7C5CFF),
-  'Grateful': Color(0xFF22D3EE),
+  'Grateful': Color(0xFF1877F2),
 };
 
-/// In-memory demo store. Firebase (Auth + Firestore) will replace this later;
-/// the UI only talks to [AppState], so the swap stays contained.
+/// In-memory demo store. Firebase (Auth + Firestore) will replace this later.
 class AppState extends ChangeNotifier {
   final List<Post> posts = [];
   final List<AppNotification> notifications = [];
   final List<Post> myPosts = [];
+  final List<Person> people = [];
 
   int streak = 5;
-  int followers = 1284;
+  int friends = 842;
   int following = 316;
   final List<String> badges = ['First post', '7-day streak', 'Helpful'];
   String username = 'Anjaan';
@@ -160,11 +165,20 @@ class AppState extends ChangeNotifier {
     ]);
 
     notifications.addAll([
-      AppNotification(text: 'Someone reposted your post.', time: '8m', icon: Icons.repeat),
-      AppNotification(text: 'Someone liked your post.', time: '10m', icon: Icons.favorite),
-      AppNotification(text: 'New comment: "I am in the same boat."', time: '35m', icon: Icons.mode_comment),
+      AppNotification(text: 'Someone shared your post.', time: '8m', icon: Icons.repeat),
+      AppNotification(text: 'Someone liked your post.', time: '10m', icon: Icons.thumb_up_alt_outlined),
+      AppNotification(text: 'New comment: "I am in the same boat."', time: '35m', icon: Icons.mode_comment_outlined),
       AppNotification(text: 'Today\'s prompt: How are you feeling right now?', time: '3h', icon: Icons.auto_awesome),
       AppNotification(text: 'You hit a 7-day streak. Nice.', time: '1d', icon: Icons.local_fire_department),
+    ]);
+
+    people.addAll([
+      Person(name: 'Riya Sharma', mutual: '12 mutual friends', friend: false),
+      Person(name: 'Arjun Mehta', mutual: '8 mutual friends', friend: true),
+      Person(name: 'Neha Verma', mutual: '23 mutual friends', friend: false),
+      Person(name: 'Kabir Singh', mutual: '5 mutual friends', friend: false),
+      Person(name: 'Priya Nair', mutual: '17 mutual friends', friend: true),
+      Person(name: 'Rahul Das', mutual: '3 mutual friends', friend: false),
     ]);
 
     myPosts.addAll(posts.where((x) => x.anonymous));
@@ -190,7 +204,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleRepost(Post post) {
+  void toggleShare(Post post) {
     post.reposted = !post.reposted;
     post.reposts += post.reposted ? 1 : -1;
     notifyListeners();
@@ -198,6 +212,11 @@ class AppState extends ChangeNotifier {
 
   void addComment(Post post, String text) {
     post.comments.add(Comment(author: username, text: text, time: 'now'));
+    notifyListeners();
+  }
+
+  void toggleFriend(Person person) {
+    person.friend = !person.friend;
     notifyListeners();
   }
 

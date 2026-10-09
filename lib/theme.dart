@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
 
-/// Brand accents and gradients.
+/// Facebook-style brand colours.
 class Brand {
-  static const violet = Color(0xFF6D5EF8);
-  static const cyan = Color(0xFF22D3EE);
-  static const pink = Color(0xFFF43F8E);
-  static const green = Color(0xFF22C55E);
-  static const amber = Color(0xFFF59E0B);
-  static const primary = violet;
+  static const blue = Color(0xFF1877F2);
+  static const blueDark = Color(0xFF0A66C2);
+  static const green = Color(0xFF42B72A);
+  static const red = Color(0xFFF02849);
 
   static const gradient = LinearGradient(
-    colors: [violet, cyan],
+    colors: [Color(0xFF1877F2), Color(0xFF4B9BFF)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const cover = LinearGradient(
+    colors: [Color(0xFF1877F2), Color(0xFF6BB6FF)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 }
 
-/// Dark + light palettes so the app follows the system setting.
 class Palette {
   final Color bg;
   final Color surface;
@@ -24,6 +27,7 @@ class Palette {
   final Color text;
   final Color secondary;
   final Color border;
+  final Color divider;
 
   const Palette({
     required this.bg,
@@ -32,40 +36,33 @@ class Palette {
     required this.text,
     required this.secondary,
     required this.border,
+    required this.divider,
   });
 
   static const dark = Palette(
-    bg: Color(0xFF0A0E1A),
-    surface: Color(0xFF121829),
-    surfaceAlt: Color(0xFF1A2133),
-    text: Color(0xFFF2F5FF),
-    secondary: Color(0xFF9AA4BF),
-    border: Color(0xFF232B40),
+    bg: Color(0xFF18191A),
+    surface: Color(0xFF242526),
+    surfaceAlt: Color(0xFF3A3B3C),
+    text: Color(0xFFE4E6EB),
+    secondary: Color(0xFFB0B3B8),
+    border: Color(0xFF3E4042),
+    divider: Color(0xFF3E4042),
   );
 
   static const light = Palette(
-    bg: Color(0xFFF5F6FB),
+    bg: Color(0xFFF0F2F5),
     surface: Color(0xFFFFFFFF),
-    surfaceAlt: Color(0xFFEFF1F8),
-    text: Color(0xFF0F1424),
-    secondary: Color(0xFF5B6478),
-    border: Color(0xFFE6E9F2),
+    surfaceAlt: Color(0xFFF0F2F5),
+    text: Color(0xFF050505),
+    secondary: Color(0xFF65676B),
+    border: Color(0xFFE4E6EB),
+    divider: Color(0xFFE4E6EB),
   );
 
   bool get isDark => identical(this, dark);
 
   static Palette of(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark ? dark : light;
-
-  List<BoxShadow> get cardShadow => isDark
-      ? const []
-      : [
-          BoxShadow(
-            color: const Color(0xFF0F1424).withValues(alpha: 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ];
 }
 
 ThemeData appTheme(Brightness brightness) {
@@ -76,30 +73,26 @@ ThemeData appTheme(Brightness brightness) {
     brightness: brightness,
     scaffoldBackgroundColor: p.bg,
     colorScheme: ColorScheme.fromSeed(
-      seedColor: Brand.violet,
+      seedColor: Brand.blue,
       brightness: brightness,
-    ).copyWith(
-      primary: Brand.violet,
-      surface: p.surface,
-      onSurface: p.text,
-    ),
+    ).copyWith(primary: Brand.blue, surface: p.surface, onSurface: p.text),
     appBarTheme: AppBarTheme(
-      backgroundColor: p.bg,
+      backgroundColor: p.surface,
       foregroundColor: p.text,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
       surfaceTintColor: Colors.transparent,
-      titleTextStyle: TextStyle(color: p.text, fontSize: 20, fontWeight: FontWeight.w800),
+      titleTextStyle: TextStyle(color: p.text, fontSize: 19, fontWeight: FontWeight.w800),
     ),
-    dividerTheme: DividerThemeData(color: p.border, thickness: 1, space: 1),
+    dividerTheme: DividerThemeData(color: p.divider, thickness: 1, space: 1),
     tabBarTheme: TabBarThemeData(
-      labelColor: p.text,
+      labelColor: Brand.blue,
       unselectedLabelColor: p.secondary,
-      indicatorColor: Brand.violet,
-      indicatorSize: TabBarIndicatorSize.label,
-      dividerColor: p.border,
-      labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+      indicatorColor: Brand.blue,
+      indicatorSize: TabBarIndicatorSize.tab,
+      dividerColor: p.divider,
+      labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
       unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
     ),
     inputDecorationTheme: InputDecorationTheme(
@@ -107,70 +100,55 @@ ThemeData appTheme(Brightness brightness) {
       fillColor: p.surfaceAlt,
       hintStyle: TextStyle(color: p.secondary),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: p.border),
+        borderRadius: BorderRadius.circular(22),
+        borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: p.border),
+        borderRadius: BorderRadius.circular(22),
+        borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Brand.violet, width: 1.6),
+        borderRadius: BorderRadius.circular(22),
+        borderSide: const BorderSide(color: Brand.blue, width: 1.4),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: Brand.violet,
+        backgroundColor: Brand.blue,
         foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: p.text,
         side: BorderSide(color: p.border),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
       ),
     ),
   );
 }
 
-/// A soft, rounded card used across the app.
-class SoftCard extends StatelessWidget {
+/// A flat Facebook-style card block.
+class FbCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final VoidCallback? onTap;
-  final Gradient? gradient;
-
-  const SoftCard({
-    super.key,
-    required this.child,
-    this.padding = const EdgeInsets.all(16),
-    this.onTap,
-    this.gradient,
-  });
+  const FbCard({super.key, required this.child, this.padding = EdgeInsets.zero, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     return Container(
-      decoration: BoxDecoration(
-        color: gradient == null ? p.surface : null,
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: gradient == null ? p.border : Colors.transparent),
-        boxShadow: p.cardShadow,
-      ),
+      color: p.surface,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
           onTap: onTap,
           child: Padding(padding: padding, child: child),
         ),
