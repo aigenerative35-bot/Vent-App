@@ -703,7 +703,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
     }
     appState.addPost(text, _mood, _anonymous, _visibility, _tags(text), poll);
     _controller.clear();
-    showFlash(context, title: 'Snip', subtitle: 'Posted', icon: Icons.auto_awesome, color: Brand.blue);
+    showFlash(context, title: 'Snipet', subtitle: 'Posted', icon: Icons.auto_awesome, color: Brand.blue);
     Navigator.of(context).pop();
   }
 
