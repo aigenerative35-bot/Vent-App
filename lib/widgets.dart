@@ -286,6 +286,9 @@ class PostCard extends StatelessWidget {
     final p = Palette.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final author = appState.userFor(post.author);
+    final translated = appState.translations[post.id];
+    final showingTranslation = translated != null && appState.showTranslated.contains(post.id);
+    final bodyText = (showingTranslation ? translated : post.text) ?? post.text;
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       child: Block(
@@ -356,9 +359,24 @@ class PostCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
+            if (showingTranslation) ...[
+              Row(
+                children: [
+                  Icon(Icons.translate, size: 13, color: p.secondary),
+                  const SizedBox(width: 5),
+                  Text('Translated', style: TextStyle(color: p.secondary, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: () => appState.toggleTranslation(post),
+                    child: Text('Show original', style: TextStyle(color: Brand.blue, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+            ],
             onTag != null
                 ? TagText(
-                    text: post.text,
+                    text: bodyText,
                     style: TextStyle(color: p.text, fontSize: 15, height: 1.45),
                     onTag: onTag!,
                     onMention: (h) {
@@ -369,7 +387,26 @@ class PostCard extends StatelessWidget {
                       if (!u.isMe) onAuthor?.call(u);
                     },
                   )
-                : Text(post.text, style: TextStyle(color: p.text, fontSize: 15, height: 1.45)),
+                : Text(bodyText, style: TextStyle(color: p.text, fontSize: 15, height: 1.45)),
+            if (translated != null && !showingTranslation)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: GestureDetector(
+                  onTap: () => appState.toggleTranslation(post),
+                  child: Text('Show translation', style: TextStyle(color: Brand.blue, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            if (appState.isTranslating(post))
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Row(
+                  children: [
+                    SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.6, color: p.secondary)),
+                    const SizedBox(width: 8),
+                    Text('Translating…', style: TextStyle(color: p.secondary, fontSize: 11.5)),
+                  ],
+                ),
+              ),
             if (post.imageBytes != null) ...[
               const SizedBox(height: 10),
               ClipRRect(
@@ -459,6 +496,14 @@ class PostCard extends StatelessWidget {
             appState.toggleBookmark(post);
             toast(appState.isBookmarked(post) ? 'Saved to bookmarks' : 'Removed from bookmarks');
             break;
+          case 'translate':
+            if (appState.translations.containsKey(post.id)) {
+              appState.toggleTranslation(post);
+            } else {
+              toast('Translating…');
+              appState.translatePost(post);
+            }
+            break;
           case 'edit':
             onEdit?.call();
             break;
@@ -497,6 +542,10 @@ class PostCard extends StatelessWidget {
       },
       itemBuilder: (context) => [
         PopupMenuItem(value: 'bookmark', child: _mi(Icons.bookmark_add_outlined, appState.isBookmarked(post) ? 'Remove bookmark' : 'Bookmark')),
+        PopupMenuItem(
+            value: 'translate',
+            child: _mi(Icons.translate,
+                appState.translations.containsKey(post.id) ? (appState.showTranslated.contains(post.id) ? 'Show original' : 'Show translation') : 'Translate')),
         PopupMenuItem(value: 'share', child: _mi(Icons.link, 'Copy link')),
         if (mine) PopupMenuItem(value: 'edit', child: _mi(Icons.edit_outlined, 'Edit')),
         if (mine) PopupMenuItem(value: 'delete', child: _mi(Icons.delete_outline, 'Delete')),

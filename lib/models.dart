@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'repository.dart';
+import 'translate.dart';
 
 enum PostVisibility { public, followers, private }
 
@@ -684,6 +685,37 @@ class AppState extends ChangeNotifier {
   // ---- language ----
   void setLang(String l) {
     lang = l;
+    notifyListeners();
+  }
+
+  // ---- translation (X-style "Translate post") ----
+  final Map<String, String> translations = {};
+  final Set<String> showTranslated = {};
+  final Set<String> translating = {};
+
+  bool isTranslating(Post p) => translating.contains(p.id);
+
+  /// Translate a post into the user's current app language (or English).
+  /// Tapping Translate again on an already-translated post toggles it.
+  Future<void> translatePost(Post p) async {
+    if (translations.containsKey(p.id)) {
+      toggleTranslation(p);
+      return;
+    }
+    translating.add(p.id);
+    notifyListeners();
+    final target = lang == 'hi' ? 'hi' : 'en';
+    final out = await Translator.translate(p.text, target);
+    translating.remove(p.id);
+    if (out != null && out.isNotEmpty && out != p.text) {
+      translations[p.id] = out;
+      showTranslated.add(p.id);
+    }
+    notifyListeners();
+  }
+
+  void toggleTranslation(Post p) {
+    if (!showTranslated.add(p.id)) showTranslated.remove(p.id);
     notifyListeners();
   }
 
