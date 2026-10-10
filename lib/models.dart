@@ -692,24 +692,32 @@ class AppState extends ChangeNotifier {
   final Map<String, String> translations = {};
   final Set<String> showTranslated = {};
   final Set<String> translating = {};
+  final Map<String, String> translateErrors = {};
 
   bool isTranslating(Post p) => translating.contains(p.id);
 
   /// Translate a post into the user's current app language (or English).
-  /// Tapping Translate again on an already-translated post toggles it.
+  /// Never throws — a failure is stored in [translateErrors] for the UI to
+  /// show with a retry, so a bad network can never crash the app.
   Future<void> translatePost(Post p) async {
     if (translations.containsKey(p.id)) {
       toggleTranslation(p);
       return;
     }
+    if (translating.contains(p.id)) return; // already in flight
     translating.add(p.id);
+    translateErrors.remove(p.id);
     notifyListeners();
+
     final target = lang == 'hi' ? 'hi' : 'en';
-    final out = await Translator.translate(p.text, target);
+    final res = await TranslateService.translate(p.text, target);
+
     translating.remove(p.id);
-    if (out != null && out.isNotEmpty && out != p.text) {
-      translations[p.id] = out;
+    if (res.ok && res.text != null && res.text != p.text) {
+      translations[p.id] = res.text!;
       showTranslated.add(p.id);
+    } else if (!res.ok) {
+      translateErrors[p.id] = res.error ?? 'Translation failed';
     }
     notifyListeners();
   }

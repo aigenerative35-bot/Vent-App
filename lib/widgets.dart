@@ -407,6 +407,23 @@ class PostCard extends StatelessWidget {
                   ],
                 ),
               ),
+            if (appState.translateErrors[post.id] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: GestureDetector(
+                  onTap: () => appState.translatePost(post),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, size: 13, color: Brand.red),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text('${appState.translateErrors[post.id]} · Tap to retry',
+                            style: TextStyle(color: Brand.red, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             if (post.imageBytes != null) ...[
               const SizedBox(height: 10),
               ClipRRect(

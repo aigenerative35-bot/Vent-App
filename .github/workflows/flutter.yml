@@ -32,7 +32,13 @@ jobs:
         run: flutter pub get
 
       - name: Build release APK
-        run: flutter build apk --release
+        env:
+          TRANSLATE_PROVIDER: ${{ secrets.TRANSLATE_PROVIDER }}
+          TRANSLATE_API_KEY: ${{ secrets.TRANSLATE_API_KEY }}
+        run: |
+          flutter build apk --release \
+            --dart-define=TRANSLATE_PROVIDER="${TRANSLATE_PROVIDER}" \
+            --dart-define=TRANSLATE_API_KEY="${TRANSLATE_API_KEY}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
