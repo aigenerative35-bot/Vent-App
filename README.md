@@ -1,6 +1,6 @@
-# Vent
+# Snip
 
-Vent is a Flutter social app where people share short, anonymous text posts about
+# Snip is a Flutter social app where people share short, anonymous text posts about
 how they feel, and others can view, comment (with replies), **Lift** (repost) and
 like them. Weibo-style layout in blue, English UI, light + dark themes.
 

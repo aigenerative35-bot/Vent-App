@@ -368,6 +368,7 @@ class PostCard extends StatelessWidget {
                 ],
               ],
             ),
+            if (post.poll != null) PollView(post: post),
             const SizedBox(height: 6),
             Divider(height: 1, color: p.divider),
             const SizedBox(height: 2),
@@ -394,7 +395,14 @@ class PostCard extends StatelessWidget {
                     icon: Icons.repeat,
                     value: post.lifts,
                     color: post.lifted ? Brand.green : p.secondary,
-                    onTap: () => appState.toggleLift(post),
+                    onTap: () {
+                      final was = post.lifted;
+                      appState.toggleLift(post);
+                      if (!was) {
+                        showFlash(context,
+                            title: 'Lift', subtitle: 'Reposted', icon: Icons.repeat, color: Brand.green);
+                      }
+                    },
                   ),
                 ),
                 Expanded(
@@ -644,6 +652,181 @@ class EmptyState extends StatelessWidget {
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center, style: TextStyle(color: p.secondary, fontSize: 14)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A poll attached to a post: tap an option to vote.
+class PollView extends StatelessWidget {
+  final Post post;
+  const PollView({super.key, required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    final poll = post.poll!;
+    final total = poll.total;
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...List.generate(poll.options.length, (i) {
+            final pct = total == 0 ? 0.0 : poll.votes[i] / total;
+            final chosen = poll.myVote == i;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: InkWell(
+                onTap: () => appState.votePoll(post, i),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  height: 42,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: chosen ? Brand.blue : p.border, width: chosen ? 1.6 : 1),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Stack(
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: FractionallySizedBox(
+                            widthFactor: pct.clamp(0.0, 1.0),
+                            heightFactor: 1,
+                            child: Container(color: Brand.blue.withValues(alpha: 0.16)),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(poll.options[i],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        color: p.text,
+                                        fontSize: 14,
+                                        fontWeight: chosen ? FontWeight.w800 : FontWeight.w500)),
+                              ),
+                              Text('${(pct * 100).round()}%',
+                                  style: TextStyle(
+                                      color: p.secondary, fontSize: 13, fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+          Text('$total votes', style: TextStyle(color: p.secondary, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Brief animated confirmation (post = "Snip", repost = "Lift").
+void showFlash(BuildContext context,
+    {required String title, required String subtitle, required IconData icon, Color? color}) {
+  final overlay = Overlay.of(context, rootOverlay: true);
+  late OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (_) => _Flash(
+      title: title,
+      subtitle: subtitle,
+      icon: icon,
+      color: color ?? Brand.blue,
+      onDone: () {
+        if (entry.mounted) entry.remove();
+      },
+    ),
+  );
+  overlay.insert(entry);
+}
+
+class _Flash extends StatefulWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onDone;
+  const _Flash({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onDone,
+  });
+
+  @override
+  State<_Flash> createState() => _FlashState();
+}
+
+class _FlashState extends State<_Flash> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1500));
+  late final Animation<double> _opacity = TweenSequence<double>([
+    TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 20),
+    TweenSequenceItem(tween: ConstantTween(1.0), weight: 60),
+    TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 20),
+  ]).animate(_c);
+  late final Animation<double> _scale =
+      CurvedAnimation(parent: _c, curve: const Interval(0, 0.4, curve: Curves.elasticOut));
+
+  @override
+  void initState() {
+    super.initState();
+    _c.forward().whenComplete(widget.onDone);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Center(
+        child: FadeTransition(
+          opacity: _opacity,
+          child: ScaleTransition(
+            scale: _scale,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 20),
+              decoration: BoxDecoration(
+                color: widget.color,
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10)),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(widget.icon, color: Colors.white, size: 38),
+                  const SizedBox(height: 8),
+                  Text(widget.title,
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 2),
+                  Text(widget.subtitle,
+                      style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

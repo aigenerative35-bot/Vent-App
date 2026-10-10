@@ -57,6 +57,24 @@ class Comment {
   }) : replies = replies ?? [];
 }
 
+class Poll {
+  final List<String> options;
+  final List<int> votes;
+  int? myVote;
+
+  Poll({required this.options, List<int>? votes, this.myVote})
+      : votes = votes ?? List.filled(options.length, 0);
+
+  int get total => votes.fold(0, (s, v) => s + v);
+
+  void vote(int i) {
+    if (myVote == i) return;
+    if (myVote != null) votes[myVote!] -= 1;
+    myVote = i;
+    votes[i] += 1;
+  }
+}
+
 class Post {
   final String id;
   final String author;
@@ -68,6 +86,7 @@ class Post {
   final PostVisibility visibility;
   final List<String> tags;
   final String? groupName;
+  final Poll? poll;
   int views;
   int likes;
   bool liked;
@@ -86,6 +105,7 @@ class Post {
     this.visibility = PostVisibility.public,
     this.tags = const [],
     this.groupName,
+    this.poll,
     this.views = 0,
     this.likes = 0,
     this.liked = false,
@@ -239,6 +259,9 @@ class AppState extends ChangeNotifier {
           createdAt: DateTime.now().subtract(Duration(hours: (i + 1) * 7)),
           tags: t[2].split(' '),
           groupName: ['Exam Stress', 'Office Life', 'Night Owls'][i % 3],
+          poll: i == 0
+              ? Poll(options: ['Yes, a lot', 'Sometimes', 'Not really'], votes: [42, 27, 11])
+              : null,
           views: 800 + i * 137,
           likes: 20 + (i * 53) % 900,
           lifts: 3 + (i * 11) % 180,
@@ -266,7 +289,7 @@ class AppState extends ChangeNotifier {
 
     groups.addAll([
       Group(id: 'g1', name: 'Exam Stress', description: 'For anyone fighting exams right now.', members: 1200, joined: true),
-      Group(id: 'g2', name: 'Office Life', description: 'Vent about work, safely.', members: 840),
+      Group(id: 'g2', name: 'Office Life', description: 'Talk about work, safely.', members: 840),
       Group(id: 'g3', name: 'Night Owls', description: 'For the 2am thoughts.', members: 430, joined: true),
     ]);
 
@@ -334,7 +357,7 @@ class AppState extends ChangeNotifier {
     return out;
   }
 
-  void addPost(String text, String mood, bool anonymous, PostVisibility visibility, List<String> tags) {
+  void addPost(String text, String mood, bool anonymous, PostVisibility visibility, List<String> tags, [Poll? poll]) {
     final post = Post(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       author: me.name,
@@ -345,6 +368,7 @@ class AppState extends ChangeNotifier {
       createdAt: DateTime.now(),
       visibility: visibility,
       tags: tags,
+      poll: poll,
       views: 1,
     );
     posts.insert(0, post);
@@ -363,6 +387,11 @@ class AppState extends ChangeNotifier {
     post.liked = !post.liked;
     post.likes += post.liked ? 1 : -1;
     if (post.liked) interests[post.mood] = (interests[post.mood] ?? 0) + 1;
+    notifyListeners();
+  }
+
+  void votePoll(Post post, int index) {
+    post.poll?.vote(index);
     notifyListeners();
   }
 

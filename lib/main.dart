@@ -15,7 +15,7 @@ class VentApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Vent',
+      title: 'Snip',
       debugShowCheckedModeBanner: false,
       theme: appTheme(Brightness.light),
       darkTheme: appTheme(Brightness.dark),

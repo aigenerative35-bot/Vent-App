@@ -174,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               height: 32,
               decoration: BoxDecoration(gradient: Brand.gradient, borderRadius: BorderRadius.circular(9)),
               alignment: Alignment.center,
-              child: const Text('V', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+              child: const Text('S', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -186,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   children: [
                     Icon(Icons.search, size: 18, color: p.secondary),
                     const SizedBox(width: 8),
-                    Text('Search Vent', style: TextStyle(color: p.secondary, fontSize: 14)),
+                    Text('Search Snip', style: TextStyle(color: p.secondary, fontSize: 14)),
                   ],
                 ),
               ),
@@ -675,6 +675,8 @@ class ComposeScreen extends StatefulWidget {
 
 class _ComposeScreenState extends State<ComposeScreen> {
   final _controller = TextEditingController();
+  final _pollControllers = List.generate(4, (_) => TextEditingController());
+  bool _pollOn = false;
   String _mood = moodList.first;
   late bool _anonymous = appState.publicByDefault ? false : true;
   PostVisibility _visibility = PostVisibility.public;
@@ -682,6 +684,9 @@ class _ComposeScreenState extends State<ComposeScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    for (final c in _pollControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -691,10 +696,15 @@ class _ComposeScreenState extends State<ComposeScreen> {
   void _submit() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    appState.addPost(text, _mood, _anonymous, _visibility, _tags(text));
+    Poll? poll;
+    if (_pollOn) {
+      final opts = _pollControllers.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
+      if (opts.length >= 2) poll = Poll(options: opts);
+    }
+    appState.addPost(text, _mood, _anonymous, _visibility, _tags(text), poll);
     _controller.clear();
+    showFlash(context, title: 'Snip', subtitle: 'Posted', icon: Icons.auto_awesome, color: Brand.blue);
     Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Posted')));
   }
 
   @override
@@ -797,8 +807,29 @@ class _ComposeScreenState extends State<ComposeScreen> {
               subtitle: Text('Your name will not be shown', style: TextStyle(color: p.secondary, fontSize: 12.5)),
             ),
           ),
+          const SizedBox(height: 16),
+          Block(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: SwitchListTile(
+              value: _pollOn,
+              onChanged: (v) => setState(() => _pollOn = v),
+              title: Text('Add a poll', style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w700)),
+              subtitle: Text('Up to 4 options', style: TextStyle(color: p.secondary, fontSize: 12.5)),
+            ),
+          ),
+          if (_pollOn) ...[
+            const SizedBox(height: 8),
+            ...List.generate(4, (i) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: TextField(
+                    controller: _pollControllers[i],
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(hintText: 'Option ${i + 1}${i < 2 ? '' : ' (optional)'}'),
+                  ),
+                )),
+          ],
           const SizedBox(height: 8),
-          Text('Posts are text only. Use Status for photos. Posts auto-delete after 1 month.',
+          Text('Posts are text only (max 300). Use Status for photos. Posts auto-delete after 1 month.',
               style: TextStyle(color: p.secondary, fontSize: 12)),
         ],
       ),
@@ -1321,7 +1352,7 @@ class StudioScreen extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('About us'),
-        content: const Text('Vent is a safe, anonymous place to say how you feel.\n\nBe kind. Report abuse. Posts auto-delete after 1 month.'),
+        content: const Text('Snip is a safe, anonymous place to say how you feel.\n\nBe kind. Report abuse. Posts auto-delete after 1 month.'),
         actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
       ),
     );
