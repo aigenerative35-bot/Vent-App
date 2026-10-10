@@ -1012,7 +1012,9 @@ class UserProfileScreen extends StatelessWidget {
           return ListView(
             padding: EdgeInsets.zero,
             children: [
-              Container(height: 110, decoration: const BoxDecoration(gradient: Brand.cover)),
+              user.bannerBytes != null
+                  ? Image.memory(user.bannerBytes!, height: 110, width: double.infinity, fit: BoxFit.cover)
+                  : Container(height: 110, decoration: const BoxDecoration(gradient: Brand.cover)),
               Transform.translate(
                 offset: const Offset(0, -44),
                 child: Padding(
@@ -1026,7 +1028,7 @@ class UserProfileScreen extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(shape: BoxShape.circle, color: p.bg),
-                            child: Avatar(label: user.name, size: 88, color: avatarColors[user.colorIndex], verified: user.verified),
+                            child: Avatar(label: user.name, size: 88, color: avatarColors[user.colorIndex], verified: user.verified, imageBytes: user.avatarBytes),
                           ),
                           const Spacer(),
                           Padding(
@@ -1093,7 +1095,7 @@ class ProfileScreen extends StatelessWidget {
         ),
         body: Column(
           children: [
-            _header(context, p),
+            ListenableBuilder(listenable: appState, builder: (context, _) => _header(context, p)),
             const TabBar(tabs: [Tab(text: 'Posts'), Tab(text: 'Status'), Tab(text: 'About')]),
             Expanded(
               child: TabBarView(
@@ -1162,14 +1164,16 @@ class ProfileScreen extends StatelessWidget {
           height: 148,
           child: Stack(
             children: [
-              Container(height: 140, decoration: const BoxDecoration(gradient: Brand.cover)),
+              appState.me.bannerBytes != null
+                  ? Image.memory(appState.me.bannerBytes!, height: 140, width: double.infinity, fit: BoxFit.cover)
+                  : Container(height: 140, decoration: const BoxDecoration(gradient: Brand.cover)),
               Positioned(
                 left: 0, right: 0, top: 86,
                 child: Center(
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(shape: BoxShape.circle, color: p.bg),
-                    child: const Avatar(label: 'A', size: 96, verified: false),
+                    child: Avatar(label: appState.me.name, size: 96, verified: appState.me.verified, imageBytes: appState.me.avatarBytes),
                   ),
                 ),
               ),
@@ -1560,6 +1564,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
+  Future<void> _pickAvatar() async {
+    final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    setState(() => appState.me.avatarBytes = bytes);
+  }
+
+  Future<void> _pickBanner() async {
+    final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    setState(() => appState.me.bannerBytes = bytes);
+  }
+
   void _save() {
     setState(() {
       if (_name.text.trim().isNotEmpty) appState.me.name = _name.text.trim();
@@ -1592,7 +1610,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [
-          Center(child: Avatar(label: appState.me.name, size: 88, color: Brand.blue)),
+          Center(
+            child: Avatar(
+                label: appState.me.name,
+                size: 88,
+                color: Brand.blue,
+                verified: appState.me.verified,
+                imageBytes: appState.me.avatarBytes),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton.icon(
+                  onPressed: _pickAvatar,
+                  icon: const Icon(Icons.photo_camera_outlined, size: 17),
+                  label: const Text('Photo')),
+              TextButton.icon(
+                  onPressed: _pickBanner,
+                  icon: const Icon(Icons.wallpaper_outlined, size: 17),
+                  label: const Text('Banner')),
+            ],
+          ),
           const SizedBox(height: 6),
           Center(
             child: TextButton.icon(
@@ -1625,6 +1663,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           Text('Country', style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14)),
           const SizedBox(height: 6),
           TextField(controller: _country, decoration: const InputDecoration(hintText: 'India')),
+          const SizedBox(height: 16),
+          Block(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: SwitchListTile(
+              value: appState.me.verified,
+              onChanged: (v) => setState(() => appState.me.verified = v),
+              title: Text('Verified badge', style: TextStyle(color: p.text, fontSize: 14.5, fontWeight: FontWeight.w700)),
+              subtitle: Text('Show a blue tick on your profile', style: TextStyle(color: p.secondary, fontSize: 12.5)),
+            ),
+          ),
         ],
       ),
     );

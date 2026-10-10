@@ -24,6 +24,8 @@ class User {
   int followers;
   int following;
   final bool isMe;
+  Uint8List? avatarBytes;
+  Uint8List? bannerBytes;
 
   User({
     required this.id,

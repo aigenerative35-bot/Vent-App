@@ -26,22 +26,27 @@ class Avatar extends StatelessWidget {
   final double size;
   final Color? color;
   final bool verified;
-  const Avatar({super.key, required this.label, this.size = 42, this.color, this.verified = false});
+  final Uint8List? imageBytes;
+  const Avatar({super.key, required this.label, this.size = 42, this.color, this.verified = false, this.imageBytes});
 
   @override
   Widget build(BuildContext context) {
     final c = color ?? Brand.blue;
     return Stack(
       children: [
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(color: c, shape: BoxShape.circle),
-          alignment: Alignment.center,
-          child: Text(
-            label.isNotEmpty ? label[0].toUpperCase() : '?',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: size * 0.4),
-          ),
+        ClipOval(
+          child: imageBytes != null
+              ? Image.memory(imageBytes!, width: size, height: size, fit: BoxFit.cover)
+              : Container(
+                  width: size,
+                  height: size,
+                  decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+                  alignment: Alignment.center,
+                  child: Text(
+                    label.isNotEmpty ? label[0].toUpperCase() : '?',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: size * 0.4),
+                  ),
+                ),
         ),
         if (verified)
           Positioned(
@@ -286,6 +291,7 @@ class PostCard extends StatelessWidget {
                     label: post.anonymous ? 'A' : post.author,
                     color: post.anonymous ? p.secondary : avatarColors[author.colorIndex],
                     verified: !post.anonymous && author.verified,
+                    imageBytes: post.anonymous ? null : author.avatarBytes,
                   ),
                 ),
                 const SizedBox(width: 10),
