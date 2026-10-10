@@ -19,6 +19,8 @@ class User {
   bool verified;
   final int colorIndex;
   String bio;
+  String link;
+  String country;
   int followers;
   int following;
   final bool isMe;
@@ -30,6 +32,8 @@ class User {
     this.verified = false,
     this.colorIndex = 0,
     this.bio = '',
+    this.link = '',
+    this.country = '',
     this.followers = 0,
     this.following = 0,
     this.isMe = false,
@@ -63,6 +67,7 @@ class Post {
   final DateTime createdAt;
   final PostVisibility visibility;
   final List<String> tags;
+  final String? groupName;
   int views;
   int likes;
   bool liked;
@@ -80,6 +85,7 @@ class Post {
     required this.createdAt,
     this.visibility = PostVisibility.public,
     this.tags = const [],
+    this.groupName,
     this.views = 0,
     this.likes = 0,
     this.liked = false,
@@ -232,6 +238,7 @@ class AppState extends ChangeNotifier {
           time: '${(i + 1) * 7}m',
           createdAt: DateTime.now().subtract(Duration(hours: (i + 1) * 7)),
           tags: t[2].split(' '),
+          groupName: ['Exam Stress', 'Office Life', 'Night Owls'][i % 3],
           views: 800 + i * 137,
           likes: 20 + (i * 53) % 900,
           lifts: 3 + (i * 11) % 180,
@@ -260,7 +267,7 @@ class AppState extends ChangeNotifier {
     groups.addAll([
       Group(id: 'g1', name: 'Exam Stress', description: 'For anyone fighting exams right now.', members: 1200, joined: true),
       Group(id: 'g2', name: 'Office Life', description: 'Vent about work, safely.', members: 840),
-      Group(id: 'g3', name: 'Night Owls', description: 'For the 2am thoughts.', members: 430),
+      Group(id: 'g3', name: 'Night Owls', description: 'For the 2am thoughts.', members: 430, joined: true),
     ]);
 
     statuses.addAll([
@@ -454,6 +461,16 @@ class AppState extends ChangeNotifier {
 
   List<Post> get forYouFeed => forYou.take(_visible).toList();
   List<Post> get hotFeed => trending.take(_visible).toList();
+
+  Set<String> get joinedGroupNames =>
+      groups.where((g) => g.joined).map((g) => g.name).toSet();
+
+  /// Feed of posts from the groups this user has joined.
+  List<Post> get groupFeed {
+    purgeExpired();
+    final joined = joinedGroupNames;
+    return posts.where((p) => p.groupName != null && joined.contains(p.groupName)).toList();
+  }
 
   // ---- username generator ----
   String suggestUsername(String name) {

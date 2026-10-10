@@ -157,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       case 1:
         return appState.feed;
       default:
-        return appState.hotFeed;
+        return appState.groupFeed;
     }
   }
 
@@ -204,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         bottom: TabBar(
           controller: _tab,
           onTap: (_) => setState(() {}),
-          tabs: const [Tab(text: 'For You'), Tab(text: 'Latest'), Tab(text: 'Hot')],
+          tabs: const [Tab(text: 'For You'), Tab(text: 'Latest'), Tab(text: 'Group Feed')],
         ),
       ),
       body: ListenableBuilder(
@@ -218,6 +218,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             children.add(const StatusRow());
             children.add(_topicsRow(context));
             children.add(const SectionHeader(icon: Icons.auto_awesome, title: 'Recommended for you', subtitle: '70% matched to your interests'));
+          }
+          if (_tab.index == 2) {
+            children.add(const SectionHeader(icon: Icons.groups_outlined, title: 'Group Feed', subtitle: 'Posts from groups you joined'));
           }
           for (var i = 0; i < list.length; i++) {
             children.add(PostCard(
@@ -1102,6 +1105,8 @@ class ProfileScreen extends StatelessWidget {
                     children: [
                       ListTile(leading: Icon(Icons.info_outline, color: p.secondary), title: Text(appState.me.bio, style: TextStyle(color: p.text, fontSize: 14))),
                       ListTile(leading: Icon(Icons.alternate_email, color: p.secondary), title: Text(appState.me.handle, style: TextStyle(color: p.text, fontSize: 14))),
+                      ListTile(leading: Icon(Icons.link, color: p.secondary), title: Text(appState.me.link.isEmpty ? 'No link yet' : appState.me.link, style: TextStyle(color: p.text, fontSize: 14))),
+                      ListTile(leading: Icon(Icons.public, color: p.secondary), title: Text(appState.me.country.isEmpty ? 'No country set' : appState.me.country, style: TextStyle(color: p.text, fontSize: 14))),
                       ListTile(leading: Icon(Icons.local_fire_department_outlined, color: p.secondary), title: Text('${appState.streak}-day streak', style: TextStyle(color: p.text, fontSize: 14))),
                     ],
                   ),
@@ -1479,17 +1484,7 @@ class FeedAdSlot extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            Text('Feeling overwhelmed? A 5-minute guided breathing break can help.',
-                style: TextStyle(color: p.text, fontSize: 14.5, height: 1.4)),
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8)),
-                onPressed: () {},
-                child: const Text('Learn more'),
-              ),
-            ),
+            nativeAdWidget(),
           ],
         ),
       ),
@@ -1508,12 +1503,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final _name = TextEditingController(text: appState.me.name);
   late final _handle = TextEditingController(text: appState.me.handle);
   late final _bio = TextEditingController(text: appState.me.bio);
+  late final _link = TextEditingController(text: appState.me.link);
+  late final _country = TextEditingController(text: appState.me.country);
 
   @override
   void dispose() {
     _name.dispose();
     _handle.dispose();
     _bio.dispose();
+    _link.dispose();
+    _country.dispose();
     super.dispose();
   }
 
@@ -1522,6 +1521,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (_name.text.trim().isNotEmpty) appState.me.name = _name.text.trim();
       if (_handle.text.trim().isNotEmpty) appState.me.handle = _handle.text.trim();
       appState.me.bio = _bio.text.trim();
+      appState.me.link = _link.text.trim();
+      appState.me.country = _country.text.trim();
     });
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated')));
@@ -1572,6 +1573,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           Text('Bio', style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14)),
           const SizedBox(height: 6),
           TextField(controller: _bio, maxLines: 3, decoration: const InputDecoration(hintText: 'About you')),
+          const SizedBox(height: 16),
+          Text('Link', style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14)),
+          const SizedBox(height: 6),
+          TextField(controller: _link, keyboardType: TextInputType.url, decoration: const InputDecoration(hintText: 'https://your-site.com')),
+          const SizedBox(height: 16),
+          Text('Country', style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 14)),
+          const SizedBox(height: 6),
+          TextField(controller: _country, decoration: const InputDecoration(hintText: 'India')),
         ],
       ),
     );

@@ -347,7 +347,27 @@ class PostCard extends StatelessWidget {
                   )
                 : Text(post.text, style: TextStyle(color: p.text, fontSize: 15, height: 1.45)),
             const SizedBox(height: 10),
-            MoodTag(mood: post.mood),
+            Row(
+              children: [
+                MoodTag(mood: post.mood),
+                if (post.groupName != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                    decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(20)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.groups_outlined, size: 12, color: p.secondary),
+                        const SizedBox(width: 4),
+                        Text(post.groupName!,
+                            style: TextStyle(color: p.secondary, fontSize: 11, fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
             const SizedBox(height: 6),
             Divider(height: 1, color: p.divider),
             const SizedBox(height: 2),
