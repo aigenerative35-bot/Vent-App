@@ -1479,7 +1479,17 @@ class FeedAdSlot extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            nativeAdWidget(),
+            Text('Feeling overwhelmed? A 5-minute guided breathing break can help.',
+                style: TextStyle(color: p.text, fontSize: 14.5, height: 1.4)),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8)),
+                onPressed: () {},
+                child: const Text('Learn more'),
+              ),
+            ),
           ],
         ),
       ),
