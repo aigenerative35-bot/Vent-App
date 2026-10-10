@@ -1,5 +1,8 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'repository.dart';
 
 enum PostVisibility { public, followers, private }
 
@@ -89,6 +92,7 @@ class Post {
   final List<String> tags;
   final String? groupName;
   final Poll? poll;
+  Uint8List? imageBytes;
   int views;
   int likes;
   bool liked;
@@ -108,6 +112,7 @@ class Post {
     this.tags = const [],
     this.groupName,
     this.poll,
+    this.imageBytes,
     this.views = 0,
     this.likes = 0,
     this.liked = false,
@@ -120,6 +125,24 @@ class Post {
   String get handle => anonymous ? '@anjaan' : '@${author.toLowerCase()}';
   bool get expired => DateTime.now().difference(createdAt).inDays >= 30;
   int get daysLeft => 30 - DateTime.now().difference(createdAt).inDays;
+}
+
+/// An unfinished post the user saved for later.
+class Draft {
+  String text;
+  String mood;
+  bool anonymous;
+  List<String> tags;
+  Uint8List? imageBytes;
+  DateTime savedAt;
+  Draft({
+    this.text = '',
+    this.mood = 'Happy',
+    this.anonymous = true,
+    this.tags = const [],
+    this.imageBytes,
+    DateTime? savedAt,
+  }) : savedAt = savedAt ?? DateTime.now();
 }
 
 class Group {
@@ -211,6 +234,14 @@ class AppState extends ChangeNotifier {
   final Set<String> followingIds = {};
   final Map<String, int> interests = {};
 
+  // social
+  final Set<String> bookmarkedIds = {};
+  final Set<String> blockedIds = {};
+  final Set<String> mutedIds = {};
+  final Set<String> reportedIds = {};
+  final List<Draft> drafts = [];
+  String lang = 'en';
+
   // settings
   bool notifyReplies = true;
   bool notifyLikes = true;
@@ -222,8 +253,36 @@ class AppState extends ChangeNotifier {
 
   late User me;
 
-  AppState() {
+  /// Storage boundary — swap for a FirestoreRepository later; nothing else changes.
+  final DataRepository repo;
+
+  Timer? _saveTimer;
+  bool _loaded = false;
+
+  AppState({DataRepository? repository}) : repo = repository ?? LocalRepository() {
     _seed();
+  }
+
+  /// Load previously saved data (called once at startup).
+  Future<void> init() async {
+    final data = await repo.load();
+    if (data != null) {
+      try {
+        applyJson(data);
+      } catch (_) {}
+    }
+    _loaded = true;
+    super.notifyListeners();
+  }
+
+  @override
+  void notifyListeners() {
+    super.notifyListeners();
+    if (!_loaded) return;
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 700), () {
+      repo.save(toJson());
+    });
   }
 
   void _seed() {
@@ -334,7 +393,7 @@ class AppState extends ChangeNotifier {
 
   List<Post> get feed {
     purgeExpired();
-    return posts.take(_visible).toList();
+    return posts.where((p) => p.anonymous || !_hiddenAuthor(p.author)).take(_visible).toList();
   }
 
   bool get hasMore => _visible < posts.length;
@@ -359,7 +418,7 @@ class AppState extends ChangeNotifier {
     return out;
   }
 
-  void addPost(String text, String mood, bool anonymous, PostVisibility visibility, List<String> tags, [Poll? poll]) {
+  void addPost(String text, String mood, bool anonymous, PostVisibility visibility, List<String> tags, {Poll? poll, Uint8List? imageBytes}) {
     final post = Post(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       author: me.name,
@@ -371,6 +430,7 @@ class AppState extends ChangeNotifier {
       visibility: visibility,
       tags: tags,
       poll: poll,
+      imageBytes: imageBytes,
       views: 1,
     );
     posts.insert(0, post);
@@ -478,7 +538,7 @@ class AppState extends ChangeNotifier {
 
   List<Post> get forYou {
     purgeExpired();
-    final list = [...posts];
+    final list = posts.where((p) => p.anonymous || !_hiddenAuthor(p.author)).toList();
     list.sort((a, b) => _score(b).compareTo(_score(a)));
     return list;
   }
@@ -509,6 +569,352 @@ class AppState extends ChangeNotifier {
     final n = 100 + DateTime.now().millisecond % 900;
     return '@${base.isEmpty ? 'user' : base}$n';
   }
+
+  // ---- bookmarks ----
+  bool isBookmarked(Post p) => bookmarkedIds.contains(p.id);
+  void toggleBookmark(Post p) {
+    if (!bookmarkedIds.add(p.id)) bookmarkedIds.remove(p.id);
+    notifyListeners();
+  }
+  List<Post> get bookmarkedPosts => posts.where((p) => bookmarkedIds.contains(p.id)).toList();
+
+  // ---- block / mute / report ----
+  bool isBlocked(User u) => blockedIds.contains(u.id);
+  bool isMuted(User u) => mutedIds.contains(u.id);
+  void toggleBlock(User u) {
+    if (u.isMe) return;
+    if (!blockedIds.add(u.id)) blockedIds.remove(u.id);
+    notifyListeners();
+  }
+  void toggleMute(User u) {
+    if (u.isMe) return;
+    if (!mutedIds.add(u.id)) mutedIds.remove(u.id);
+    notifyListeners();
+  }
+  List<User> get blockedUsers => users.where((u) => blockedIds.contains(u.id)).toList();
+  List<User> get mutedUsers => users.where((u) => mutedIds.contains(u.id)).toList();
+  void reportPost(Post p) {
+    reportedIds.add(p.id);
+    posts.remove(p);
+    myPosts.remove(p);
+    notifyListeners();
+  }
+  bool _hiddenAuthor(String name) {
+    final u = users.firstWhere(
+      (x) => x.name.toLowerCase() == name.toLowerCase(),
+      orElse: () => me,
+    );
+    return blockedIds.contains(u.id) || mutedIds.contains(u.id);
+  }
+
+  // ---- drafts ----
+  void addDraft(String text, String mood, bool anonymous, List<String> tags, {Uint8List? imageBytes}) {
+    drafts.insert(0, Draft(text: text, mood: mood, anonymous: anonymous, tags: tags, imageBytes: imageBytes));
+    notifyListeners();
+  }
+  void removeDraft(Draft d) {
+    drafts.remove(d);
+    notifyListeners();
+  }
+
+  // ---- edit post ----
+  void editPost(Post p, String text, List<String> tags, {Uint8List? imageBytes}) {
+    final updated = Post(
+      id: p.id,
+      author: p.author,
+      anonymous: p.anonymous,
+      mood: p.mood,
+      text: text,
+      time: p.time,
+      createdAt: p.createdAt,
+      visibility: p.visibility,
+      tags: tags,
+      groupName: p.groupName,
+      poll: p.poll,
+      imageBytes: imageBytes ?? p.imageBytes,
+      views: p.views,
+      likes: p.likes,
+      liked: p.liked,
+      lifts: p.lifts,
+      lifted: p.lifted,
+      comments: p.comments,
+    );
+    final i = posts.indexOf(p);
+    if (i >= 0) posts[i] = updated;
+    final idx = myPosts.indexOf(p);
+    if (idx >= 0) myPosts[idx] = updated;
+    notifyListeners();
+  }
+
+  // ---- followers / following ----
+  List<User> get followingList => users.where((u) => followingIds.contains(u.id)).toList();
+  List<User> get followersList =>
+      users.where((u) => !u.isMe && !followingIds.contains(u.id)).take(8).toList();
+
+  // ---- search ----
+  List<User> searchUsers(String q) {
+    final s = q.toLowerCase().replaceAll('@', '').trim();
+    if (s.isEmpty) return [];
+    return users
+        .where((u) =>
+            u.name.toLowerCase().contains(s) ||
+            u.handle.toLowerCase().contains(s) ||
+            u.bio.toLowerCase().contains(s))
+        .toList();
+  }
+  List<Post> searchPosts(String q) {
+    final s = q.toLowerCase().trim();
+    if (s.isEmpty) return [];
+    return posts.where((p) => p.text.toLowerCase().contains(s)).toList();
+  }
+  List<String> searchTags(String q) {
+    final s = q.toLowerCase().replaceAll('#', '').trim();
+    final set = <String>{};
+    for (final p in posts) {
+      for (final t in p.tags) {
+        final tag = t.replaceAll('#', '');
+        if (tag.isEmpty) continue;
+        if (s.isEmpty || tag.toLowerCase().contains(s)) set.add(tag);
+      }
+    }
+    final list = set.toList()..sort();
+    return list;
+  }
+
+  // ---- language ----
+  void setLang(String l) {
+    lang = l;
+    notifyListeners();
+  }
+
+  // ---- persistence (the only place that knows the storage format) ----
+  Map<String, dynamic> toJson() => {
+        'me': _userJson(me),
+        'users': users.map(_userJson).toList(),
+        'posts': posts.map(_postJson).toList(),
+        'myPosts': myPosts.map((p) => p.id).toList(),
+        'following': followingIds.toList(),
+        'bookmarks': bookmarkedIds.toList(),
+        'blocked': blockedIds.toList(),
+        'muted': mutedIds.toList(),
+        'drafts': drafts
+            .map((d) => {
+                  'text': d.text,
+                  'mood': d.mood,
+                  'anonymous': d.anonymous,
+                  'tags': d.tags,
+                  'image': _b64(d.imageBytes),
+                  'savedAt': d.savedAt.millisecondsSinceEpoch,
+                })
+            .toList(),
+        'groups': groups
+            .map((g) => {'id': g.id, 'name': g.name, 'description': g.description, 'members': g.members, 'joined': g.joined})
+            .toList(),
+        'statuses': statuses
+            .map((s) => {'id': s.id, 'author': s.author, 'caption': s.caption, 'gradientIndex': s.gradientIndex, 'image': _b64(s.imageBytes), 'createdAt': s.createdAt.millisecondsSinceEpoch})
+            .toList(),
+        'interests': interests,
+        'lang': lang,
+        'settings': {
+          'notifyReplies': notifyReplies,
+          'notifyLikes': notifyLikes,
+          'publicByDefault': publicByDefault,
+          'showAds': showAds,
+        },
+      };
+
+  void applyJson(Map<String, dynamic> j) {
+    if (j['me'] is Map) me = _userFrom(j['me'] as Map, isMe: true);
+    if (j['users'] is List) {
+      users
+        ..clear()
+        ..addAll((j['users'] as List).map((e) => _userFrom(e as Map)));
+      if (!users.any((u) => u.isMe)) users.insert(0, me);
+    }
+    if (j['posts'] is List) {
+      posts
+        ..clear()
+        ..addAll((j['posts'] as List).map((e) => _postFrom(e as Map)));
+    }
+    if (j['myPosts'] is List) {
+      final ids = (j['myPosts'] as List).cast<String>().toSet();
+      myPosts
+        ..clear()
+        ..addAll(posts.where((p) => ids.contains(p.id)));
+    }
+    followingIds
+      ..clear()
+      ..addAll(((j['following'] as List?) ?? []).cast<String>());
+    bookmarkedIds
+      ..clear()
+      ..addAll(((j['bookmarks'] as List?) ?? []).cast<String>());
+    blockedIds
+      ..clear()
+      ..addAll(((j['blocked'] as List?) ?? []).cast<String>());
+    mutedIds
+      ..clear()
+      ..addAll(((j['muted'] as List?) ?? []).cast<String>());
+    if (j['drafts'] is List) {
+      drafts
+        ..clear()
+        ..addAll((j['drafts'] as List).map((e) {
+          final m = e as Map;
+          return Draft(
+            text: '${m['text'] ?? ''}',
+            mood: '${m['mood'] ?? 'Happy'}',
+            anonymous: m['anonymous'] == true,
+            tags: ((m['tags'] as List?) ?? []).cast<String>(),
+            imageBytes: _unb64(m['image']),
+            savedAt: DateTime.fromMillisecondsSinceEpoch(
+                (m['savedAt'] as int?) ?? DateTime.now().millisecondsSinceEpoch),
+          );
+        }));
+    }
+    if (j['groups'] is List) {
+      groups
+        ..clear()
+        ..addAll((j['groups'] as List).map((e) {
+          final m = e as Map;
+          return Group(
+            id: '${m['id']}',
+            name: '${m['name']}',
+            description: '${m['description'] ?? ''}',
+            members: (m['members'] as int?) ?? 0,
+            joined: m['joined'] == true,
+          );
+        }));
+    }
+    if (j['statuses'] is List) {
+      statuses
+        ..clear()
+        ..addAll((j['statuses'] as List).map((e) {
+          final m = e as Map;
+          return Status(
+            id: '${m['id']}',
+            author: '${m['author']}',
+            caption: '${m['caption'] ?? ''}',
+            gradientIndex: (m['gradientIndex'] as int?) ?? 0,
+            imageBytes: _unb64(m['image']),
+            createdAt: DateTime.fromMillisecondsSinceEpoch(
+                (m['createdAt'] as int?) ?? DateTime.now().millisecondsSinceEpoch),
+          );
+        }));
+    }
+    if (j['interests'] is Map) {
+      interests
+        ..clear()
+        ..addAll((j['interests'] as Map).map((k, v) => MapEntry('$k', (v as num).toInt())));
+    }
+    if (j['lang'] is String) lang = j['lang'] as String;
+    final st = j['settings'];
+    if (st is Map) {
+      notifyReplies = st['notifyReplies'] != false;
+      notifyLikes = st['notifyLikes'] != false;
+      publicByDefault = st['publicByDefault'] != false;
+      showAds = st['showAds'] != false;
+    }
+  }
+
+  // ---- (de)serialization helpers ----
+  static String? _b64(Uint8List? b) => b == null ? null : base64Encode(b);
+  static Uint8List? _unb64(dynamic s) => (s is String && s.isNotEmpty) ? base64Decode(s) : null;
+
+  static Map<String, dynamic> _userJson(User u) => {
+        'id': u.id,
+        'name': u.name,
+        'handle': u.handle,
+        'verified': u.verified,
+        'colorIndex': u.colorIndex,
+        'bio': u.bio,
+        'link': u.link,
+        'country': u.country,
+        'followers': u.followers,
+        'following': u.following,
+        'isMe': u.isMe,
+        'avatar': _b64(u.avatarBytes),
+        'banner': _b64(u.bannerBytes),
+      };
+  static User _userFrom(Map m, {bool isMe = false}) => User(
+        id: '${m['id']}',
+        name: '${m['name'] ?? 'User'}',
+        handle: '${m['handle'] ?? ''}',
+        verified: m['verified'] == true,
+        colorIndex: (m['colorIndex'] as int?) ?? 0,
+        bio: '${m['bio'] ?? ''}',
+        link: '${m['link'] ?? ''}',
+        country: '${m['country'] ?? ''}',
+        followers: (m['followers'] as int?) ?? 0,
+        following: (m['following'] as int?) ?? 0,
+        isMe: isMe || m['isMe'] == true,
+      )
+        ..avatarBytes = _unb64(m['avatar'])
+        ..bannerBytes = _unb64(m['banner']);
+
+  static Map<String, dynamic> _postJson(Post p) => {
+        'id': p.id,
+        'author': p.author,
+        'anonymous': p.anonymous,
+        'mood': p.mood,
+        'text': p.text,
+        'time': p.time,
+        'createdAt': p.createdAt.millisecondsSinceEpoch,
+        'visibility': p.visibility.index,
+        'tags': p.tags,
+        'groupName': p.groupName,
+        'image': _b64(p.imageBytes),
+        'views': p.views,
+        'likes': p.likes,
+        'liked': p.liked,
+        'lifts': p.lifts,
+        'lifted': p.lifted,
+        'poll': p.poll == null
+            ? null
+            : {'options': p.poll!.options, 'votes': p.poll!.votes, 'myVote': p.poll!.myVote},
+        'comments': p.comments.map(_commentJson).toList(),
+      };
+  static Post _postFrom(Map m) => Post(
+        id: '${m['id']}',
+        author: '${m['author']}',
+        anonymous: m['anonymous'] == true,
+        mood: '${m['mood'] ?? 'Happy'}',
+        text: '${m['text'] ?? ''}',
+        time: '${m['time'] ?? ''}',
+        createdAt: DateTime.fromMillisecondsSinceEpoch(
+            (m['createdAt'] as int?) ?? DateTime.now().millisecondsSinceEpoch),
+        visibility: PostVisibility.values[(m['visibility'] as int?) ?? 0],
+        tags: ((m['tags'] as List?) ?? []).cast<String>(),
+        groupName: m['groupName'] as String?,
+        imageBytes: _unb64(m['image']),
+        views: (m['views'] as int?) ?? 0,
+        likes: (m['likes'] as int?) ?? 0,
+        liked: m['liked'] == true,
+        lifts: (m['lifts'] as int?) ?? 0,
+        lifted: m['lifted'] == true,
+        poll: m['poll'] == null
+            ? null
+            : Poll(
+                options: ((m['poll'] as Map)['options'] as List).cast<String>(),
+                votes: ((m['poll'] as Map)['votes'] as List).cast<int>(),
+                myVote: (m['poll'] as Map)['myVote'] as int?,
+              ),
+        comments: ((m['comments'] as List?) ?? []).map((e) => _commentFrom(e as Map)).toList(),
+      );
+  static Map<String, dynamic> _commentJson(Comment c) => {
+        'author': c.author,
+        'text': c.text,
+        'time': c.time,
+        'likes': c.likes,
+        'liked': c.liked,
+        'replies': c.replies.map(_commentJson).toList(),
+      };
+  static Comment _commentFrom(Map m) => Comment(
+        author: '${m['author']}',
+        text: '${m['text'] ?? ''}',
+        time: '${m['time'] ?? ''}',
+        likes: (m['likes'] as int?) ?? 0,
+        liked: m['liked'] == true,
+        replies: ((m['replies'] as List?) ?? []).map((e) => _commentFrom(e as Map)).toList(),
+      );
 }
 
 final AppState appState = AppState();

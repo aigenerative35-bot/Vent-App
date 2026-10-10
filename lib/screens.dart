@@ -1,7 +1,10 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'ads.dart';
 import 'auth.dart';
+import 'extra_screens.dart';
+import 'i18n.dart';
 import 'theme.dart';
 import 'models.dart';
 import 'widgets.dart';
@@ -179,16 +182,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Container(
-                height: 38,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(19)),
-                child: Row(
-                  children: [
-                    Icon(Icons.search, size: 18, color: p.secondary),
-                    const SizedBox(width: 8),
-                    Text('Search Snip', style: TextStyle(color: p.secondary, fontSize: 14)),
-                  ],
+              child: GestureDetector(
+                onTap: () => openScreen(context, const SearchScreen()),
+                child: Container(
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(color: p.surfaceAlt, borderRadius: BorderRadius.circular(19)),
+                  child: Row(
+                    children: [
+                      Icon(Icons.search, size: 18, color: p.secondary),
+                      const SizedBox(width: 8),
+                      Text('Search Snip', style: TextStyle(color: p.secondary, fontSize: 14)),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -229,6 +235,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               onTap: () => openPost(context, list[i]),
               onTag: (t) => openTopic(context, t),
               onAuthor: (u) => openUser(context, u),
+              onEdit: () => openScreen(context, ComposeScreen(edit: list[i])),
             ));
             if (i > 0 && i % 7 == 0) children.add(const FeedAdSlot());
           }
@@ -380,7 +387,7 @@ class DiscoverScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Discover')),
+      appBar: AppBar(title: Text(tr('nav.discover'))),
       body: ListenableBuilder(
         listenable: appState,
         builder: (context, _) {
@@ -430,7 +437,7 @@ class GroupsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Groups')),
+      appBar: AppBar(title: Text(tr('nav.groups'))),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Brand.blue,
         onPressed: () => _createDialog(context),
@@ -529,7 +536,7 @@ class StatusScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Status')),
+      appBar: AppBar(title: Text(tr('nav.status'))),
       body: ListenableBuilder(
         listenable: appState,
         builder: (context, _) {
@@ -668,7 +675,9 @@ class NotificationsScreen extends StatelessWidget {
 // ------------------------------------------------------------- COMPOSE
 
 class ComposeScreen extends StatefulWidget {
-  const ComposeScreen({super.key});
+  const ComposeScreen({super.key, this.edit, this.draft});
+  final Post? edit;
+  final Draft? draft;
 
   @override
   State<ComposeScreen> createState() => _ComposeScreenState();
@@ -681,6 +690,39 @@ class _ComposeScreenState extends State<ComposeScreen> {
   String _mood = moodList.first;
   late bool _anonymous = appState.publicByDefault ? false : true;
   PostVisibility _visibility = PostVisibility.public;
+  Uint8List? _imageBytes;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.edit;
+    final d = widget.draft;
+    if (e != null) {
+      _controller.text = e.text;
+      _mood = e.mood;
+      _anonymous = e.anonymous;
+      _visibility = e.visibility;
+      _imageBytes = e.imageBytes;
+    } else if (d != null) {
+      _controller.text = d.text;
+      _mood = d.mood;
+      _anonymous = d.anonymous;
+      _imageBytes = d.imageBytes;
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final file = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 70, maxWidth: 1400);
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    setState(() => _imageBytes = bytes);
+  }
+
+  void _saveDraft() {
+    appState.addDraft(_controller.text, _mood, _anonymous, _tags(_controller.text), imageBytes: _imageBytes);
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved to drafts')));
+  }
 
   @override
   void dispose() {
@@ -697,12 +739,19 @@ class _ComposeScreenState extends State<ComposeScreen> {
   void _submit() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+    if (widget.edit != null) {
+      appState.editPost(widget.edit!, text, _tags(text), imageBytes: _imageBytes);
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Post updated')));
+      return;
+    }
     Poll? poll;
     if (_pollOn) {
       final opts = _pollControllers.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
       if (opts.length >= 2) poll = Poll(options: opts);
     }
-    appState.addPost(text, _mood, _anonymous, _visibility, _tags(text), poll);
+    appState.addPost(text, _mood, _anonymous, _visibility, _tags(text), poll: poll, imageBytes: _imageBytes);
+    if (widget.draft != null) appState.removeDraft(widget.draft!);
     _controller.clear();
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Posted')));
@@ -713,14 +762,18 @@ class _ComposeScreenState extends State<ComposeScreen> {
     final p = Palette.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create post'),
+        title: Text(widget.edit != null ? 'Edit post' : 'Create post'),
         actions: [
+          TextButton(
+            onPressed: _controller.text.trim().isEmpty ? null : _saveDraft,
+            child: Text(tr('title.drafts')),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: FilledButton(
               style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10)),
               onPressed: _controller.text.trim().isEmpty ? null : _submit,
-              child: const Text('Post'),
+              child: Text(widget.edit != null ? 'Save' : 'Post'),
             ),
           ),
         ],
@@ -731,7 +784,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
           Row(
             children: [
               Avatar(label: _anonymous ? 'A' : appState.me.name[0],
-                  color: _anonymous ? p.secondary : Brand.blue, verified: !_anonymous),
+                  color: _anonymous ? p.secondary : Brand.blue, verified: !_anonymous,
+                  imageBytes: _anonymous ? null : appState.me.avatarBytes),
               const SizedBox(width: 10),
               Text(_anonymous ? 'Anjaan' : appState.me.name,
                   style: TextStyle(color: p.text, fontWeight: FontWeight.w800, fontSize: 15)),
@@ -754,6 +808,29 @@ class _ComposeScreenState extends State<ComposeScreen> {
               counterText: '',
             ),
           ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: _pickImage,
+                icon: const Icon(Icons.image_outlined, size: 18),
+                label: Text(_imageBytes == null ? 'Add photo' : 'Change photo'),
+              ),
+              if (_imageBytes != null)
+                TextButton.icon(
+                  onPressed: () => setState(() => _imageBytes = null),
+                  icon: const Icon(Icons.close, size: 18),
+                  label: const Text('Remove'),
+                ),
+            ],
+          ),
+          if (_imageBytes != null) ...[
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.memory(_imageBytes!, height: 180, width: double.infinity, fit: BoxFit.cover),
+            ),
+          ],
           const SizedBox(height: 6),
           Divider(color: p.divider),
           const SizedBox(height: 14),
@@ -830,7 +907,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                 )),
           ],
           const SizedBox(height: 8),
-          Text('Posts are text only (max 300). Use Status for photos. Posts auto-delete after 1 month.',
+          Text('Max 300 characters. Add a photo if you like. Posts auto-delete after 1 month.',
               style: TextStyle(color: p.secondary, fontSize: 12)),
         ],
       ),
@@ -1086,7 +1163,7 @@ class ProfileScreen extends StatelessWidget {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Me'),
+          title: Text(tr('nav.profile')),
           actions: [
             IconButton(onPressed: () => openStudio(context), icon: const Icon(Icons.insights_outlined)),
             IconButton(onPressed: () => _open(context, const SettingsScreen()), icon: const Icon(Icons.settings_outlined)),
@@ -1188,8 +1265,11 @@ class ProfileScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 2),
-        Text('${fmt(appState.me.following)} following  ·  ${fmt(appState.me.followers)} followers',
-            style: TextStyle(color: p.secondary, fontSize: 13)),
+        GestureDetector(
+          onTap: () => openScreen(context, const FollowListScreen()),
+          child: Text('${fmt(appState.me.following)} following  ·  ${fmt(appState.me.followers)} followers',
+              style: TextStyle(color: Brand.blue, fontSize: 13, fontWeight: FontWeight.w600)),
+        ),
         const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1212,8 +1292,36 @@ class ProfileScreen extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
+            children: [
+              Expanded(child: _quick(context, Icons.bookmark_border, tr('title.bookmarks'), () => openScreen(context, const BookmarksScreen()))),
+              const SizedBox(width: 8),
+              Expanded(child: _quick(context, Icons.edit_note, tr('title.drafts'), () => openScreen(context, const DraftsScreen()))),
+              const SizedBox(width: 8),
+              Expanded(child: _quick(context, Icons.people_outline, tr('title.people'), () => openScreen(context, const FollowListScreen()))),
+            ],
+          ),
+        ),
         const SizedBox(height: 12),
       ],
+    );
+  }
+
+  Widget _quick(BuildContext context, IconData icon, String label, VoidCallback onTap) {
+    final p = Palette.of(context);
+    return Block(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        children: [
+          Icon(icon, size: 20, color: Brand.blue),
+          const SizedBox(height: 6),
+          Text(label, style: TextStyle(color: p.text, fontSize: 12, fontWeight: FontWeight.w700)),
+        ],
+      ),
     );
   }
 }
@@ -1378,7 +1486,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final p = Palette.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(tr('title.settings'))),
       body: ListenableBuilder(
         listenable: appState,
         builder: (context, _) {
@@ -1391,7 +1499,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 padding: const EdgeInsets.all(14),
                 child: Row(
                   children: [
-                    const Avatar(label: 'A', size: 44, color: Brand.blue),
+                    Avatar(label: appState.me.name, size: 44, color: Brand.blue, verified: appState.me.verified, imageBytes: appState.me.avatarBytes),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -1457,6 +1565,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 18),
+              Text('${tr('title.bookmarks')} & ${tr('title.drafts')}', style: TextStyle(color: p.text, fontSize: 15, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Block(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.bookmark_border, color: Brand.blue),
+                      title: Text(tr('title.bookmarks'), style: TextStyle(color: p.text, fontSize: 14)),
+                      trailing: Icon(Icons.chevron_right, color: p.secondary),
+                      onTap: () => openScreen(context, const BookmarksScreen()),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.edit_note, color: Brand.blue),
+                      title: Text(tr('title.drafts'), style: TextStyle(color: p.text, fontSize: 14)),
+                      trailing: Icon(Icons.chevron_right, color: p.secondary),
+                      onTap: () => openScreen(context, const DraftsScreen()),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.block, color: Brand.blue),
+                      title: Text(tr('title.blocked'), style: TextStyle(color: p.text, fontSize: 14)),
+                      trailing: Icon(Icons.chevron_right, color: p.secondary),
+                      onTap: () => openScreen(context, const BlockedMutedScreen()),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(tr('settings.language'), style: TextStyle(color: p.text, fontSize: 15, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Block(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Text('English'),
+                        selected: appState.lang == 'en',
+                        showCheckmark: false,
+                        onSelected: (_) => appState.setLang('en'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Text('हिन्दी'),
+                        selected: appState.lang == 'hi',
+                        showCheckmark: false,
+                        onSelected: (_) => appState.setLang('hi'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
               Block(
                 padding: const EdgeInsets.all(14),
                 child: Row(
@@ -1475,7 +1638,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Icon(Icons.logout, color: Brand.red),
                     const SizedBox(width: 12),
-                    Expanded(child: Text('Sign out', style: TextStyle(color: Brand.red, fontSize: 14.5, fontWeight: FontWeight.w700))),
+                    Expanded(child: Text(tr('settings.signout'), style: TextStyle(color: Brand.red, fontSize: 14.5, fontWeight: FontWeight.w700))),
                   ],
                 ),
               ),

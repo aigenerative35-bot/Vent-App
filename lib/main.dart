@@ -5,8 +5,9 @@ import 'models.dart';
 import 'theme.dart';
 import 'screens.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await appState.init();
   initAds();
   // Keep the profile in sync with whoever is signed in.
   auth.addListener(() {

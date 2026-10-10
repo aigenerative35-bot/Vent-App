@@ -1,0 +1,101 @@
+import 'models.dart';
+
+/// Tiny in-app translation layer. `tr('key')` returns the string for the
+/// currently selected language (`appState.lang`). English falls back to the
+/// key itself so a missing entry never crashes the UI.
+///
+/// Core screens (bottom nav, app bars, main buttons, settings) are wired to
+/// this. To translate more, add keys to the maps below and call `tr(...)`.
+
+const Map<String, String> _en = {
+  'app.name': 'Snip',
+  'nav.home': 'Home',
+  'nav.discover': 'Discover',
+  'nav.groups': 'Groups',
+  'nav.status': 'Status',
+  'nav.profile': 'Me',
+  'action.search': 'Search',
+  'action.post': 'Post',
+  'action.save': 'Save',
+  'action.cancel': 'Cancel',
+  'action.delete': 'Delete',
+  'action.edit': 'Edit',
+  'action.share': 'Share',
+  'action.bookmark': 'Bookmark',
+  'action.remove_bookmark': 'Remove bookmark',
+  'action.report': 'Report',
+  'action.block': 'Block',
+  'action.mute': 'Mute',
+  'action.unblock': 'Unblock',
+  'action.unmute': 'Unmute',
+  'action.follow': 'Follow',
+  'action.following': 'Following',
+  'title.bookmarks': 'Bookmarks',
+  'title.drafts': 'Drafts',
+  'title.people': 'People',
+  'title.followers': 'Followers',
+  'title.following': 'Following',
+  'title.blocked': 'Blocked & muted',
+  'title.settings': 'Settings',
+  'title.edit_profile': 'Edit profile',
+  'settings.language': 'Language',
+  'settings.appearance': 'Appearance',
+  'settings.signout': 'Sign out',
+  'empty.bookmarks': 'No saved posts yet.',
+  'empty.drafts': 'No drafts. Your unfinished posts will show here.',
+  'empty.search': 'Search users, posts or #tags.',
+  'empty.blocked': 'You have not blocked or muted anyone.',
+  'msg.copied': 'Link copied to clipboard',
+  'msg.reported': 'Reported. We will review it.',
+  'msg.post_deleted': 'Post deleted',
+  'msg.undo': 'Undo',
+};
+
+const Map<String, String> _hi = {
+  'app.name': 'Snip',
+  'nav.home': 'होम',
+  'nav.discover': 'खोज',
+  'nav.groups': 'ग्रुप',
+  'nav.status': 'स्टेटस',
+  'nav.profile': 'मैं',
+  'action.search': 'खोजें',
+  'action.post': 'पोस्ट',
+  'action.save': 'सेव',
+  'action.cancel': 'रद्द',
+  'action.delete': 'डिलीट',
+  'action.edit': 'एडिट',
+  'action.share': 'शेयर',
+  'action.bookmark': 'बुकमार्क',
+  'action.remove_bookmark': 'बुकमार्क हटाएँ',
+  'action.report': 'रिपोर्ट',
+  'action.block': 'ब्लॉक',
+  'action.mute': 'म्यूट',
+  'action.unblock': 'अनब्लॉक',
+  'action.unmute': 'अनम्यूट',
+  'action.follow': 'फॉलो',
+  'action.following': 'फॉलोइंग',
+  'title.bookmarks': 'बुकमार्क',
+  'title.drafts': 'ड्राफ्ट',
+  'title.people': 'लोग',
+  'title.followers': 'फॉलोअर्स',
+  'title.following': 'फॉलोइंग',
+  'title.blocked': 'ब्लॉक और म्यूट',
+  'title.settings': 'सेटिंग्स',
+  'title.edit_profile': 'प्रोफ़ाइल एडिट करें',
+  'settings.language': 'भाषा',
+  'settings.appearance': 'थीम',
+  'settings.signout': 'साइन आउट',
+  'empty.bookmarks': 'अभी कोई सेव किया पोस्ट नहीं।',
+  'empty.drafts': 'कोई ड्राफ्ट नहीं। अधूरे पोस्ट यहाँ दिखेंगे।',
+  'empty.search': 'यूज़र, पोस्ट या #टैग खोजें।',
+  'empty.blocked': 'आपने किसी को ब्लॉक या म्यूट नहीं किया।',
+  'msg.copied': 'लिंक कॉपी हो गया',
+  'msg.reported': 'रिपोर्ट भेजी गई। हम देखेंगे।',
+  'msg.post_deleted': 'पोस्ट डिलीट हो गया',
+  'msg.undo': 'वापस',
+};
+
+String tr(String key) {
+  final map = appState.lang == 'hi' ? _hi : _en;
+  return map[key] ?? _en[key] ?? key;
+}

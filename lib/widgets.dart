@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'theme.dart';
 import 'models.dart';
 
@@ -125,12 +126,13 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-/// Renders text with tappable #hashtags.
+/// Renders text with tappable #hashtags and @mentions.
 class TagText extends StatelessWidget {
   final String text;
   final TextStyle style;
   final void Function(String tag) onTag;
-  const TagText({super.key, required this.text, required this.style, required this.onTag});
+  final void Function(String handle)? onMention;
+  const TagText({super.key, required this.text, required this.style, required this.onTag, this.onMention});
 
   @override
   Widget build(BuildContext context) {
@@ -144,6 +146,12 @@ class TagText extends StatelessWidget {
           text: '$w$space',
           style: style.copyWith(color: Brand.blue, fontWeight: FontWeight.w700),
           recognizer: TapGestureRecognizer()..onTap = () => onTag(w.substring(1)),
+        ));
+      } else if (w.startsWith('@') && w.length > 1 && onMention != null) {
+        spans.add(TextSpan(
+          text: '$w$space',
+          style: style.copyWith(color: Brand.blue, fontWeight: FontWeight.w700),
+          recognizer: TapGestureRecognizer()..onTap = () => onMention!(w.substring(1)),
         ));
       } else {
         spans.add(TextSpan(text: '$w$space', style: style));
@@ -262,6 +270,7 @@ class PostCard extends StatelessWidget {
   final void Function(String tag)? onTag;
   final void Function(User user)? onAuthor;
   final VoidCallback? onShare;
+  final VoidCallback? onEdit;
   const PostCard({
     super.key,
     required this.post,
@@ -269,11 +278,13 @@ class PostCard extends StatelessWidget {
     this.onTag,
     this.onAuthor,
     this.onShare,
+    this.onEdit,
   });
 
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final author = appState.userFor(post.author);
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
@@ -341,7 +352,7 @@ class PostCard extends StatelessWidget {
                   FollowButton(user: author),
                   const SizedBox(width: 4),
                 ],
-                Icon(Icons.more_horiz, color: p.secondary, size: 20),
+                _menu(p, author, messenger),
               ],
             ),
             const SizedBox(height: 10),
@@ -350,8 +361,22 @@ class PostCard extends StatelessWidget {
                     text: post.text,
                     style: TextStyle(color: p.text, fontSize: 15, height: 1.45),
                     onTag: onTag!,
+                    onMention: (h) {
+                      final u = appState.users.firstWhere(
+                        (x) => x.handle.toLowerCase() == '@${h.toLowerCase()}',
+                        orElse: () => appState.me,
+                      );
+                      if (!u.isMe) onAuthor?.call(u);
+                    },
                   )
                 : Text(post.text, style: TextStyle(color: p.text, fontSize: 15, height: 1.45)),
+            if (post.imageBytes != null) ...[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.memory(post.imageBytes!, fit: BoxFit.cover, width: double.infinity),
+              ),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [
@@ -418,6 +443,74 @@ class PostCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _menu(Palette p, User author, ScaffoldMessengerState messenger) {
+    final mine = author.isMe;
+    void toast(String m) => messenger.showSnackBar(
+        SnackBar(content: Text(m), duration: const Duration(seconds: 2), behavior: SnackBarBehavior.floating));
+
+    return PopupMenuButton<String>(
+      icon: Icon(Icons.more_horiz, color: p.secondary, size: 20),
+      color: p.surface,
+      onSelected: (v) {
+        switch (v) {
+          case 'bookmark':
+            appState.toggleBookmark(post);
+            toast(appState.isBookmarked(post) ? 'Saved to bookmarks' : 'Removed from bookmarks');
+            break;
+          case 'edit':
+            onEdit?.call();
+            break;
+          case 'delete':
+            appState.deletePost(post);
+            messenger.showSnackBar(SnackBar(
+              content: const Text('Post deleted'),
+              behavior: SnackBarBehavior.floating,
+              action: SnackBarAction(
+                label: 'Undo',
+                onPressed: () {
+                  appState.posts.insert(0, post);
+                  appState.myPosts.insert(0, post);
+                  appState.notifyListeners();
+                },
+              ),
+            ));
+            break;
+          case 'report':
+            appState.reportPost(post);
+            toast('Reported. We will review it.');
+            break;
+          case 'block':
+            appState.toggleBlock(author);
+            toast(appState.isBlocked(author) ? 'Blocked ${author.name}' : 'Unblocked ${author.name}');
+            break;
+          case 'mute':
+            appState.toggleMute(author);
+            toast(appState.isMuted(author) ? 'Muted ${author.name}' : 'Unmuted ${author.name}');
+            break;
+          case 'share':
+            Clipboard.setData(ClipboardData(text: 'https://snip.app/p/${post.id}'));
+            toast('Link copied to clipboard');
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(value: 'bookmark', child: _mi(Icons.bookmark_add_outlined, appState.isBookmarked(post) ? 'Remove bookmark' : 'Bookmark')),
+        PopupMenuItem(value: 'share', child: _mi(Icons.link, 'Copy link')),
+        if (mine) PopupMenuItem(value: 'edit', child: _mi(Icons.edit_outlined, 'Edit')),
+        if (mine) PopupMenuItem(value: 'delete', child: _mi(Icons.delete_outline, 'Delete')),
+        if (!mine) PopupMenuItem(value: 'report', child: _mi(Icons.flag_outlined, 'Report')),
+        if (!mine && !post.anonymous)
+          PopupMenuItem(value: 'block', child: _mi(Icons.block, appState.isBlocked(author) ? 'Unblock' : 'Block')),
+        if (!mine && !post.anonymous)
+          PopupMenuItem(value: 'mute', child: _mi(Icons.volume_off_outlined, appState.isMuted(author) ? 'Unmute' : 'Mute')),
+      ],
+    );
+  }
+
+  Widget _mi(IconData i, String label) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [Icon(i, size: 18), const SizedBox(width: 10), Text(label)]);
   }
 }
 
