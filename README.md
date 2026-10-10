@@ -1,29 +1,48 @@
 # Snip
 
-# Snip is a Flutter social app where people share short, anonymous text posts about
-how they feel, and others can view, comment (with replies), **Lift** (repost) and
-like them. Weibo-style layout in blue, English UI, light + dark themes.
+Snip is a Flutter microblogging app. People write short, anonymous posts (max
+300 characters), attach a **poll**, and others view, comment (with replies),
+**Lift** (repost) and like them. Weibo-style layout in blue, English UI, light +
+dark themes.
 
-This version runs on **local demo data** (no backend yet). Firebase (Auth +
-Firestore) will replace the in-memory store; the UI only talks to `AppState`.
+Ads: Google AdMob (native in the feed, rewarded before analytics, app-open
+interstitial) - currently on Google's TEST ad unit ids.
 
-## Features
+## What works
 
-- **Feed**: tabs For You / Latest / Hot; AI "Recommended for you" (~70% matched
-  to the moods you engage with); infinite scroll (loads more as you scroll)
-- **Counts** on every post: views, comments, Lifts (reposts), likes
+- **Auth**: sign up / sign in with email, continue as guest, sign out
+- **Home**: For You / Latest / Group Feed tabs, AI "Recommended for you",
+  infinite scroll
+- **Posts**: 300-char limit, mood tag, **polls** (create, vote, live %),
+  hashtags, visibility (public / followers / private)
+- **Counts**: views, comments, Lifts (reposts), likes
 - **Comments with replies** (nested) and comment likes
-- **Follow** button on every user profile; tap an avatar to open their profile
-- **Verified** badges
-- **Hashtags** (#tags) are tappable and open a topic feed; **Trending topics**
-- **Post visibility**: public / followers only / private
-- **Auto-delete**: every post deletes itself 1 month after it is created
-- **Groups**: create and join groups; share a post to your followers or a group
-- **Admin panel**: analytics (views, likes, comments, followers, weekly chart),
-  quick post, links, about us
-- **Settings**: notification toggles, privacy, username generator, sponsored toggle
+- **Follow**, verified badges, tappable profiles
+- **Groups** (create/join) and share to followers or a group
 - **Status**: a 24-hour photo status that deletes itself
-- **Sponsored** slot in the feed (native-ad style)
+- **Studio**: analytics, quick post, links, about us
+- **Settings**: notifications, privacy, username generator, sign out
+
+## Architecture (and how to migrate to Firebase / Google Cloud / AWS / Yotta)
+
+The UI never touches a backend directly - it only talks to two boundaries:
+
+| Layer | File | Swap it for |
+|---|---|---|
+| Data (posts, users, groups, polls) | `lib/models.dart` (`AppState`) | Firestore, or a REST/gRPC API on your own servers |
+| Auth | `lib/auth.dart` (`AuthService`) | Firebase Auth, or your own auth service |
+| Ads | `lib/ads.dart` (platform-guarded) | AdMob (already), with your live ids |
+| Theme | `lib/theme.dart` | - |
+
+**To move to a real backend:**
+1. Write a new class that implements `AuthService` (e.g. `FirebaseAuthService`)
+   and point the `auth` instance in `lib/auth.dart` at it.
+2. Replace `AppState`'s in-memory lists with calls to your API/DB - keep the
+   same method names (`addPost`, `toggleLike`, `votePoll`, `toggleFollow`, ...).
+3. Keep push on FCM, move media to S3-compatible storage, run your services on
+   the host of your choice.
+
+No screen has to change - that is the whole point of the two boundaries above.
 
 ## Run
 
@@ -34,17 +53,7 @@ Build an APK:
 
     flutter build apk --release
 
-## Project layout
-
-- `lib/main.dart` - app entry, bottom-nav shell
-- `lib/theme.dart` - brand blue, palettes, theme, Block
-- `lib/models.dart` - models + in-memory AppState
-- `lib/widgets.dart` - Avatar, PostCard, CommentTile, StatusRing, SponsoredCard, etc.
-- `lib/screens.dart` - all screens
-- `.github/workflows/flutter.yml` - CI that builds the APK
-
 ## Notes
 
-- The app name is a working name and can change.
-- Posts are text only; photos live in the 24-hour Status.
-- Real AdMob ads and multi-user data need the Firebase / AdMob setup (next step).
+- Internal package id is still `com.ventapp.vent`; the display name is **Snip**.
+- Android + web platforms are enabled (one codebase, later a website).

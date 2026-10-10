@@ -1,11 +1,21 @@
 import 'package:flutter/material.dart';
 import 'ads.dart';
+import 'auth.dart';
+import 'models.dart';
 import 'theme.dart';
 import 'screens.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   initAds();
+  // Keep the profile in sync with whoever is signed in.
+  auth.addListener(() {
+    final s = auth.session;
+    if (s != null) {
+      appState.me.name = s.name;
+      appState.me.handle = s.handle;
+    }
+  });
   runApp(const VentApp());
 }
 
@@ -20,7 +30,10 @@ class VentApp extends StatelessWidget {
       theme: appTheme(Brightness.light),
       darkTheme: appTheme(Brightness.dark),
       themeMode: ThemeMode.system,
-      home: const RootShell(),
+      home: ListenableBuilder(
+        listenable: auth,
+        builder: (context, _) => auth.signedIn ? const RootShell() : const AuthScreen(),
+      ),
     );
   }
 }

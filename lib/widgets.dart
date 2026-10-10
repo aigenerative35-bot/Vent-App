@@ -395,14 +395,7 @@ class PostCard extends StatelessWidget {
                     icon: Icons.repeat,
                     value: post.lifts,
                     color: post.lifted ? Brand.green : p.secondary,
-                    onTap: () {
-                      final was = post.lifted;
-                      appState.toggleLift(post);
-                      if (!was) {
-                        showFlash(context,
-                            title: 'Lift', subtitle: 'Reposted', icon: Icons.repeat, color: Brand.green);
-                      }
-                    },
+                    onTap: () => appState.toggleLift(post),
                   ),
                 ),
                 Expanded(

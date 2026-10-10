@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'ads.dart';
+import 'auth.dart';
 import 'theme.dart';
 import 'models.dart';
 import 'widgets.dart';
@@ -703,8 +704,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
     }
     appState.addPost(text, _mood, _anonymous, _visibility, _tags(text), poll);
     _controller.clear();
-    showFlash(context, title: 'Snipet', subtitle: 'Posted', icon: Icons.auto_awesome, color: Brand.blue);
     Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Posted')));
   }
 
   @override
@@ -1462,6 +1463,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 18),
+              Block(
+                onTap: () => auth.signOut(),
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Brand.red),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text('Sign out', style: TextStyle(color: Brand.red, fontSize: 14.5, fontWeight: FontWeight.w700))),
+                  ],
+                ),
+              ),
             ],
           );
         },
@@ -1613,6 +1626,112 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           const SizedBox(height: 6),
           TextField(controller: _country, decoration: const InputDecoration(hintText: 'India')),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------- AUTH
+
+class AuthScreen extends StatefulWidget {
+  const AuthScreen({super.key});
+
+  @override
+  State<AuthScreen> createState() => _AuthScreenState();
+}
+
+class _AuthScreenState extends State<AuthScreen> {
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _pass = TextEditingController();
+  bool _isSignUp = false;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _pass.dispose();
+    super.dispose();
+  }
+
+  Future<void> _go() async {
+    final email = _email.text.trim();
+    if (email.isEmpty || _pass.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter email and password')),
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      if (_isSignUp) {
+        final name = _name.text.trim().isEmpty ? email.split('@').first : _name.text.trim();
+        await auth.signUp(name, email, _pass.text);
+      } else {
+        await auth.signInWithEmail(email, _pass.text);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Scaffold(
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+          children: [
+            Center(
+              child: Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(gradient: Brand.gradient, borderRadius: BorderRadius.circular(22)),
+                alignment: Alignment.center,
+                child: const Text('S',
+                    style: TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w900)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(child: Text('Snip', style: TextStyle(color: p.text, fontSize: 30, fontWeight: FontWeight.w900))),
+            const SizedBox(height: 6),
+            Center(child: Text('Say it. Snip it.', style: TextStyle(color: p.secondary, fontSize: 14))),
+            const SizedBox(height: 34),
+            if (_isSignUp) ...[
+              TextField(controller: _name, decoration: const InputDecoration(hintText: 'Name')),
+              const SizedBox(height: 12),
+            ],
+            TextField(
+                controller: _email,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(hintText: 'Email')),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _pass,
+                obscureText: true,
+                decoration: const InputDecoration(hintText: 'Password')),
+            const SizedBox(height: 22),
+            FilledButton(
+              onPressed: _busy ? null : _go,
+              child: Text(_busy ? 'Please wait...' : (_isSignUp ? 'Create account' : 'Sign in')),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: _busy ? null : () => setState(() => _isSignUp = !_isSignUp),
+              child: Text(_isSignUp ? 'Already have an account? Sign in' : 'New here? Create an account'),
+            ),
+            const SizedBox(height: 6),
+            OutlinedButton(
+              onPressed: _busy ? null : () => auth.continueAsGuest(),
+              child: const Text('Continue as guest'),
+            ),
+            const SizedBox(height: 22),
+            Text('Google / Apple sign-in gets wired up with the backend.',
+                textAlign: TextAlign.center, style: TextStyle(color: p.secondary, fontSize: 12)),
+          ],
+        ),
       ),
     );
   }
