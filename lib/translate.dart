@@ -21,18 +21,27 @@ class TranslateResult {
 ///   --dart-define=TRANSLATE_API_KEY=${{ secrets.TRANSLATE_API_KEY }}
 /// to the build step.
 class TranslateConfig {
-  /// 'google_cloud' | 'sarvam' | 'free'. Empty = auto-pick.
+  /// 'google_cloud' | 'sarvam' | 'bhashini' | 'free'. Empty = auto-pick.
   static const provider = String.fromEnvironment('TRANSLATE_PROVIDER', defaultValue: '');
   static const apiKey = String.fromEnvironment('TRANSLATE_API_KEY', defaultValue: '');
 
-  static bool get hasKey => apiKey.trim().isNotEmpty;
+  /// Bhashini (Government of India, National Language Translation Mission).
+  /// Free, but needs a free registration to get these two values from the
+  /// Bhashini / ULCA dashboard.
+  static const bhashiniUserId = String.fromEnvironment('BHASHINI_USER_ID', defaultValue: '');
+  static const bhashiniKey = String.fromEnvironment('BHASHINI_ULCA_KEY', defaultValue: '');
 
-  /// If no official key is set we fall back to key-less public endpoints.
-  /// Those are fine for a demo but are NOT licensed for commercial traffic —
-  /// set a real key before you ship.
+  static bool get hasKey => apiKey.trim().isNotEmpty;
+  static bool get hasBhashini => bhashiniUserId.trim().isNotEmpty && bhashiniKey.trim().isNotEmpty;
+
+  /// Auto-pick: explicit provider > any configured key > key-less public.
+  /// The key-less endpoints are fine for a demo but are NOT licensed for
+  /// commercial traffic — set a real key before you ship.
   static String get resolved {
     if (provider.isNotEmpty) return provider;
-    return hasKey ? 'google_cloud' : 'free';
+    if (hasKey) return 'google_cloud';
+    if (hasBhashini) return 'bhashini';
+    return 'free';
   }
 }
 
@@ -61,6 +70,9 @@ class TranslateService {
         break;
       case 'sarvam':
         r = await _sarvam(t, target);
+        break;
+      case 'bhashini':
+        r = await _bhashini(t, target);
         break;
       default:
         r = await _free(t, target);
@@ -111,6 +123,101 @@ class TranslateService {
       final data = jsonDecode(res.body);
       final out = data['translated_text'];
       if (out is String && out.trim().isNotEmpty) return TranslateResult(out.trim(), true, null);
+      return const TranslateResult(null, false, 'No translation returned');
+    } on TimeoutException {
+      return const TranslateResult(null, false, 'Translation timed out');
+    } catch (_) {
+      return const TranslateResult(null, false, 'Translation failed');
+    }
+  }
+
+  // ---- provider 3: Bhashini / ULCA (Govt of India, free with registration) ----
+  static Future<TranslateResult> _bhashini(String text, String target) async {
+    if (!TranslateConfig.hasBhashini) return _free(text, target); // graceful downgrade
+    try {
+      // Step 1: ask Bhashini for a translation pipeline (endpoint + key).
+      final pipelineRes = await http
+          .post(
+            Uri.parse('https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline'),
+            headers: {
+              'userID': TranslateConfig.bhashiniUserId,
+              'ulcaApiKey': TranslateConfig.bhashiniKey,
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'pipelineTasks': [
+                {
+                  'taskType': 'translation',
+                  'config': {
+                    'language': {'sourceLanguage': 'auto', 'targetLanguage': target}
+                  }
+                }
+              ],
+              'pipelineRequestConfig': {'pipelineId': '64392f96daac500b55c543cd'},
+            }),
+          )
+          .timeout(_timeout);
+      if (pipelineRes.statusCode != 200) {
+        return TranslateResult(null, false, _statusMessage(pipelineRes.statusCode));
+      }
+      final pdata = jsonDecode(pipelineRes.body);
+      final endpoint = pdata['pipelineInferenceAPIEndPoint'];
+      final callbackUrl = endpoint is Map ? endpoint['callbackUrl'] as String? : null;
+      final inferenceKey = (endpoint is Map && endpoint['inferenceApiKey'] is Map)
+          ? (endpoint['inferenceApiKey'] as Map)['value'] as String?
+          : null;
+      String? serviceId;
+      final rcs = pdata['pipelineResponseConfig'];
+      if (rcs is List) {
+        for (final c in rcs) {
+          if (c is Map && c['taskType'] == 'translation') {
+            final cfg = c['config'];
+            if (cfg is List && cfg.isNotEmpty && cfg[0] is Map) {
+              serviceId = (cfg[0] as Map)['serviceId'] as String?;
+            }
+            break;
+          }
+        }
+      }
+      if (callbackUrl == null || inferenceKey == null) {
+        return const TranslateResult(null, false, 'Translation service unavailable');
+      }
+
+      // Step 2: run the translation through the returned endpoint.
+      final inferRes = await http
+          .post(
+            Uri.parse(callbackUrl),
+            headers: {'Authorization': inferenceKey, 'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'pipelineTasks': [
+                {
+                  'taskType': 'translation',
+                  'config': {
+                    'language': {'sourceLanguage': 'auto', 'targetLanguage': target},
+                    if (serviceId != null) 'serviceId': serviceId,
+                  }
+                }
+              ],
+              'inputData': {
+                'input': [
+                  {'source': text}
+                ]
+              },
+            }),
+          )
+          .timeout(_timeout);
+      if (inferRes.statusCode != 200) {
+        return TranslateResult(null, false, _statusMessage(inferRes.statusCode));
+      }
+      final idata = jsonDecode(inferRes.body);
+      final pr = idata['pipelineResponse'];
+      if (pr is List && pr.isNotEmpty && pr[0] is Map) {
+        final out = (pr[0] as Map)['output'];
+        if (out is List && out.isNotEmpty && out[0] is Map) {
+          final tgt = (out[0] as Map)['target'];
+          if (tgt is String && tgt.trim().isNotEmpty) return TranslateResult(tgt.trim(), true, null);
+        }
+      }
       return const TranslateResult(null, false, 'No translation returned');
     } on TimeoutException {
       return const TranslateResult(null, false, 'Translation timed out');

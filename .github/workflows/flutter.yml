@@ -35,10 +35,14 @@ jobs:
         env:
           TRANSLATE_PROVIDER: ${{ secrets.TRANSLATE_PROVIDER }}
           TRANSLATE_API_KEY: ${{ secrets.TRANSLATE_API_KEY }}
+          BHASHINI_USER_ID: ${{ secrets.BHASHINI_USER_ID }}
+          BHASHINI_ULCA_KEY: ${{ secrets.BHASHINI_ULCA_KEY }}
         run: |
           flutter build apk --release \
             --dart-define=TRANSLATE_PROVIDER="${TRANSLATE_PROVIDER}" \
-            --dart-define=TRANSLATE_API_KEY="${TRANSLATE_API_KEY}"
+            --dart-define=TRANSLATE_API_KEY="${TRANSLATE_API_KEY}" \
+            --dart-define=BHASHINI_USER_ID="${BHASHINI_USER_ID}" \
+            --dart-define=BHASHINI_ULCA_KEY="${BHASHINI_ULCA_KEY}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
